@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
 
-import 'otp_screen.dart'; // Import de la page OTP
-import 'phone_number_dialog.dart'; // Import du pop-up numéro
+import '../widgets/otp_screen.dart'; // Import de la page OTP
+import '../widgets/phone_number_dialog.dart'; // Import du pop-up numéro
 
 import '../widgets/solde_widget.dart';
 import '../widgets/graphique_widget.dart';

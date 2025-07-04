@@ -16,7 +16,7 @@ class _PhoneNumberDialogState extends State<PhoneNumberDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text("Entrer le numéro ivoirien"),
+      title: Text("Gérant(e) de la station"),
       content: Form(
         key: _formKey,
         child: TextFormField(
