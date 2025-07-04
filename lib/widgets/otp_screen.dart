@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'otp_input_field.dart'; // Widget OTP personnalisé
+import 'otp_input_field.dart';
 
 class OtpScreen extends StatefulWidget {
   final String phone;
@@ -11,15 +11,35 @@ class OtpScreen extends StatefulWidget {
 }
 
 class _OtpScreenState extends State<OtpScreen> {
-  String otp = '';
+  bool _isLoading = false;
+  String _otp = '';
+  bool _autoSubmit = false; // Passe à true pour soumission automatique
 
-  void _onOtpCompleted(String value) {
-    setState(() => otp = value);
-    // Simuler validation automatique
+  // Appelé quand le OTP est complet dans le champ OTP
+  void _onOtpCompleted(String value) async {
+    setState(() {
+      _otp = value;
+      if (_autoSubmit) _isLoading = true;
+    });
+
+    if (_autoSubmit) {
+      await _validateOtp();
+    }
+  }
+
+  // Simule la validation du OTP (ex: appel API)
+  Future<void> _validateOtp() async {
+    await Future.delayed(Duration(seconds: 2));
+
+    setState(() {
+      _isLoading = false;
+    });
+
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Code OTP saisi : $value")),
+      SnackBar(content: Text("Montant rechargé avec succès !")),
     );
-    // TODO: Ajouter logique backend et navigation
+
+    Navigator.pop(context);
   }
 
   @override
@@ -30,13 +50,36 @@ class _OtpScreenState extends State<OtpScreen> {
         padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
-            Text("Un code a été envoyé au numéro ${widget.phone}",
-                style: TextStyle(fontSize: 16)),
-            SizedBox(height: 32),
-            OtpInputField(
-              length: 6,
-              onCompleted: _onOtpCompleted,
+            Text(
+              "Un code a été envoyé au numéro ${widget.phone}",
+              style: TextStyle(fontSize: 16),
             ),
+            SizedBox(height: 32),
+            if (_isLoading)
+              CircularProgressIndicator()
+            else
+              Column(
+                children: [
+                  OtpInputField(
+                    length: 4,
+                    enabled: !_isLoading,
+                    onCompleted: _onOtpCompleted,
+                  ),
+                  if (!_autoSubmit) SizedBox(height: 24),
+                  if (!_autoSubmit)
+                    ElevatedButton(
+                      onPressed: (_otp.length == 4 && !_isLoading)
+                          ? () async {
+                              setState(() {
+                                _isLoading = true;
+                              });
+                              await _validateOtp();
+                            }
+                          : null,
+                      child: Text("Valider"),
+                    ),
+                ],
+              ),
           ],
         ),
       ),

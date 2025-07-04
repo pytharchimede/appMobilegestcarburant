@@ -3,8 +3,13 @@ import 'package:flutter/material.dart';
 class OtpInputField extends StatefulWidget {
   final int length;
   final void Function(String) onCompleted;
+  final bool enabled;
 
-  OtpInputField({this.length = 6, required this.onCompleted});
+  OtpInputField({
+    this.length = 4,
+    required this.onCompleted,
+    this.enabled = true,
+  });
 
   @override
   _OtpInputFieldState createState() => _OtpInputFieldState();
@@ -26,14 +31,16 @@ class _OtpInputFieldState extends State<OtpInputField> {
 
   @override
   void dispose() {
-    _focusNodes.forEach((node) => node.dispose());
-    _controllers.forEach((ctrl) => ctrl.dispose());
+    for (var node in _focusNodes) node.dispose();
+    for (var ctrl in _controllers) ctrl.dispose();
     super.dispose();
   }
 
   void _onChanged(String value, int index) {
+    if (!widget.enabled) return;
+
     if (value.length > 1) {
-      // Si coller, répartir les caractères
+      // Collage : répartir les caractères
       for (int i = 0; i < value.length && i + index < widget.length; i++) {
         _controllers[i + index].text = value[i];
       }
@@ -50,11 +57,16 @@ class _OtpInputFieldState extends State<OtpInputField> {
       if (index + 1 != widget.length) {
         _focusNodes[index + 1].requestFocus();
       } else {
+        // Dernier caractère saisi, soumettre automatiquement
         _submitOtp();
       }
     } else {
+      // Suppression : reculer le focus
       if (index > 0) {
         _focusNodes[index - 1].requestFocus();
+        _controllers[index - 1].selection = TextSelection.fromPosition(
+          TextPosition(offset: _controllers[index - 1].text.length),
+        );
       }
     }
   }
@@ -77,7 +89,12 @@ class _OtpInputFieldState extends State<OtpInputField> {
         keyboardType: TextInputType.number,
         textAlign: TextAlign.center,
         maxLength: 1,
-        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        enabled: widget.enabled,
+        style: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+          color: widget.enabled ? Colors.teal[900] : Colors.grey.shade600,
+        ),
         decoration: InputDecoration(
           counterText: '',
           enabledBorder: OutlineInputBorder(
@@ -88,8 +105,15 @@ class _OtpInputFieldState extends State<OtpInputField> {
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide(color: Colors.teal, width: 2),
           ),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          fillColor: widget.enabled ? null : Colors.grey.shade200,
+          filled: !widget.enabled,
         ),
         onChanged: (value) => _onChanged(value, index),
+        onSubmitted: (_) {},
       ),
     );
   }
