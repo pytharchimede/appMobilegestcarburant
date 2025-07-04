@@ -4,8 +4,13 @@ import 'package:intl/intl.dart';
 class SoldeWidget extends StatelessWidget {
   final double solde;
   final double dernierCredit;
+  final VoidCallback onRecharge; // Ajout du callback
 
-  SoldeWidget({required this.solde, required this.dernierCredit});
+  SoldeWidget({
+    required this.solde,
+    required this.dernierCredit,
+    required this.onRecharge, // Obligatoire
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -21,11 +26,17 @@ class SoldeWidget extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Solde actuel station', style: TextStyle(color: Colors.white70)),
+              Text('Solde actuel station',
+                  style: TextStyle(color: Colors.white70)),
               SizedBox(height: 8),
-              Text('${formatMontant.format(solde)} FCFA', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+              Text('${formatMontant.format(solde)} FCFA',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold)),
               SizedBox(height: 4),
-              Text('+ ${formatMontant.format(dernierCredit)} FCFA (validé)', style: TextStyle(color: Colors.greenAccent)),
+              Text('+ ${formatMontant.format(dernierCredit)} FCFA (validé)',
+                  style: TextStyle(color: Colors.greenAccent)),
               SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
@@ -34,11 +45,7 @@ class SoldeWidget extends StatelessWidget {
                     backgroundColor: Color(0xFF00A9A5),
                     foregroundColor: Colors.white,
                   ),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Action de rechargement à définir')),
-                    );
-                  },
+                  onPressed: onRecharge, // Utilisation du callback
                   icon: Icon(Icons.add),
                   label: Text('Recharger le solde'),
                 ),

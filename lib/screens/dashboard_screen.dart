@@ -1,11 +1,16 @@
-// ... autres imports
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:intl/intl.dart';
+
+import 'otp_screen.dart'; // Import de la page OTP
+import 'phone_number_dialog.dart'; // Import du pop-up numéro
+
 import '../widgets/solde_widget.dart';
 import '../widgets/graphique_widget.dart';
 import '../widgets/solde_evolution_widget.dart';
 
+// Dashboard principal
 class DashboardScreen extends StatelessWidget {
   Future<Map<String, dynamic>> fetchSoldeData() async {
     final String response = await rootBundle.loadString('assets/solde.json');
@@ -15,15 +20,7 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Tableau de Bord'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.notifications_none),
-            onPressed: () {},
-          )
-        ],
-      ),
+      appBar: AppBar(title: Text('Tableau de Bord')),
       body: FutureBuilder<Map<String, dynamic>>(
         future: fetchSoldeData(),
         builder: (context, snapshot) {
@@ -41,6 +38,22 @@ class DashboardScreen extends StatelessWidget {
                   SoldeWidget(
                     solde: (data['solde'] as num).toDouble(),
                     dernierCredit: (data['dernierCredit'] as num).toDouble(),
+                    onRecharge: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => PhoneNumberDialog(
+                          onValidPhone: (phone) {
+                            Navigator.pop(context); // Fermer le dialog
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => OtpScreen(phone: phone),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
                   ),
                   SizedBox(height: 20),
                   GraphiqueWidget(),
@@ -53,7 +66,7 @@ class DashboardScreen extends StatelessWidget {
                       icon: Icons.pending_actions,
                       title: "Demandes en attente"),
                   MenuItem(icon: Icons.bar_chart, title: "Statistiques"),
-                  SizedBox(height: 100), // <-- Espace supplémentaire en bas
+                  SizedBox(height: 100),
                 ],
               ),
             );
@@ -64,9 +77,11 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
+// Widget MenuItem corrigé
 class MenuItem extends StatelessWidget {
   final IconData icon;
   final String title;
+
   const MenuItem({required this.icon, required this.title});
 
   @override
@@ -78,7 +93,9 @@ class MenuItem extends StatelessWidget {
         title: Text(title, style: TextStyle(color: Colors.white)),
         trailing:
             Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
-        onTap: () {},
+        onTap: () {
+          // TODO: Ajouter navigation ou action spécifique
+        },
       ),
     );
   }
