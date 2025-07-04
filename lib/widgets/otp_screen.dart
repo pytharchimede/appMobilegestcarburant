@@ -13,9 +13,8 @@ class OtpScreen extends StatefulWidget {
 class _OtpScreenState extends State<OtpScreen> {
   bool _isLoading = false;
   String _otp = '';
-  bool _autoSubmit = false; // Passe à true pour soumission automatique
+  bool _autoSubmit = false; // true = soumission auto, false = bouton visible
 
-  // Appelé quand le OTP est complet dans le champ OTP
   void _onOtpCompleted(String value) async {
     setState(() {
       _otp = value;
@@ -27,7 +26,6 @@ class _OtpScreenState extends State<OtpScreen> {
     }
   }
 
-  // Simule la validation du OTP (ex: appel API)
   Future<void> _validateOtp() async {
     await Future.delayed(Duration(seconds: 2));
 
@@ -64,6 +62,11 @@ class _OtpScreenState extends State<OtpScreen> {
                     length: 4,
                     enabled: !_isLoading,
                     onCompleted: _onOtpCompleted,
+                    onChanged: (value) {
+                      setState(() {
+                        _otp = value;
+                      });
+                    },
                   ),
                   if (!_autoSubmit) SizedBox(height: 24),
                   if (!_autoSubmit)

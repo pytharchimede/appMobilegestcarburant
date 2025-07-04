@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 class OtpInputField extends StatefulWidget {
   final int length;
   final void Function(String) onCompleted;
+  final void Function(String)? onChanged; // Ajouté
   final bool enabled;
 
   OtpInputField({
     this.length = 4,
     required this.onCompleted,
+    this.onChanged,
     this.enabled = true,
   });
 
@@ -50,6 +52,7 @@ class _OtpInputFieldState extends State<OtpInputField> {
       } else {
         _submitOtp();
       }
+      _notifyChanged();
       return;
     }
 
@@ -57,7 +60,6 @@ class _OtpInputFieldState extends State<OtpInputField> {
       if (index + 1 != widget.length) {
         _focusNodes[index + 1].requestFocus();
       } else {
-        // Dernier caractère saisi, soumettre automatiquement
         _submitOtp();
       }
     } else {
@@ -68,6 +70,14 @@ class _OtpInputFieldState extends State<OtpInputField> {
           TextPosition(offset: _controllers[index - 1].text.length),
         );
       }
+    }
+    _notifyChanged();
+  }
+
+  void _notifyChanged() {
+    if (widget.onChanged != null) {
+      String currentOtp = _controllers.map((c) => c.text).join();
+      widget.onChanged!(currentOtp);
     }
   }
 
