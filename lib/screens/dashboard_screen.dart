@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/solde_widget.dart';
 import '../widgets/otp_screen.dart';
-import '../widgets/phone_number_dialog.dart';
+import '../widgets/station_selection_dialog.dart';
 import '../widgets/graphique_widget.dart';
 import '../widgets/solde_evolution_widget.dart';
 import '../services/api_services.dart';
@@ -19,6 +19,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     soldeFuture = apiService.fetchSolde();
+  }
+
+  void _onRechargePressed() {
+    showDialog(
+      context: context,
+      builder: (_) => StationSelectionDialog(
+        onSelected: (telephone, nomGerant) async {
+          Navigator.pop(context); // Fermer le dialogue ici une seule fois
+
+          try {
+            bool success = await apiService.sendConfirmationCarburant(
+              telephone: telephone,
+              nom: nomGerant,
+            );
+            if (success) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => OtpScreen(phone: telephone)),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("Échec de l'envoi de l'OTP")),
+              );
+            }
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text("Erreur réseau ou serveur")),
+            );
+          }
+        },
+      ),
+    );
   }
 
   @override
@@ -42,22 +74,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   SoldeWidget(
                     solde: data['solde'],
                     dernierCredit: data['dernierCredit'],
-                    onRecharge: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => PhoneNumberDialog(
-                          onValidPhone: (phone) {
-                            Navigator.pop(context);
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => OtpScreen(phone: phone),
-                              ),
-                            );
-                          },
-                        ),
-                      );
-                    },
+                    onRecharge: _onRechargePressed,
                   ),
                   SizedBox(height: 20),
                   GraphiqueWidget(),

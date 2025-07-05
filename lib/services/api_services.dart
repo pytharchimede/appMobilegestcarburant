@@ -55,4 +55,43 @@ class ApiService {
       throw Exception('Erreur lors du chargement de l\'évolution du solde');
     }
   }
+
+/**
+ * Récupère la liste des stations de service.
+ * Retourne une liste de maps avec les informations des stations.
+ */
+  Future<List<Map<String, dynamic>>> fetchStationsService() async {
+    final response =
+        await http.get(Uri.parse('$baseUrl?endpoint=stations_service'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return List<Map<String, dynamic>>.from(data['data']);
+    } else {
+      throw Exception('Erreur lors du chargement des stations');
+    }
+  }
+
+/**
+ * Envoie un OTP pour le carburant.
+ * Prend en paramètre le numéro de téléphone et le nom du client.
+ */
+  Future<bool> sendConfirmationCarburant({
+    required String telephone,
+    required String nom,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl?endpoint=confirmation_carburant'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'telephone': telephone, 'nom': nom}),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      print('Réponse API confirmation_carburant: $data'); // Debug
+      return data['status'] == 'success';
+    } else {
+      print('Erreur HTTP ${response.statusCode}: ${response.body}'); // Debug
+      throw Exception('Erreur lors de l\'envoi de la confirmation carburant');
+    }
+  }
 }

@@ -4,12 +4,13 @@ import 'package:intl/intl.dart';
 class SoldeWidget extends StatelessWidget {
   final double solde;
   final double dernierCredit;
-  final VoidCallback onRecharge; // Ajout du callback
+  final VoidCallback
+      onRecharge; // Callback appelé quand on appuie sur le bouton
 
   SoldeWidget({
     required this.solde,
     required this.dernierCredit,
-    required this.onRecharge, // Obligatoire
+    required this.onRecharge,
   });
 
   @override
@@ -45,7 +46,8 @@ class SoldeWidget extends StatelessWidget {
                     backgroundColor: Color(0xFF00A9A5),
                     foregroundColor: Colors.white,
                   ),
-                  onPressed: onRecharge, // Utilisation du callback
+                  onPressed:
+                      onRecharge, // Appelle la fonction passée en paramètre
                   icon: Icon(Icons.add),
                   label: Text('Recharger le solde'),
                 ),
