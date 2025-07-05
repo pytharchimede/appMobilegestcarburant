@@ -1,20 +1,70 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../services/api_services.dart';
 
-class SoldeEvolutionWidget extends StatelessWidget {
-  // Données JSON simulées
-  final List<Map<String, dynamic>> donneesTest = [
-    {"jour": 1, "solde": 350000},
-    {"jour": 5, "solde": 420000},
-    {"jour": 10, "solde": 380000},
-    {"jour": 15, "solde": 470000},
-    {"jour": 20, "solde": 500000},
-    {"jour": 25, "solde": 450000},
-    {"jour": 30, "solde": 520000},
-  ];
+class SoldeEvolutionWidget extends StatefulWidget {
+  @override
+  _SoldeEvolutionWidgetState createState() => _SoldeEvolutionWidgetState();
+}
+
+class _SoldeEvolutionWidgetState extends State<SoldeEvolutionWidget> {
+  final ApiService apiService = ApiService();
+  List<Map<String, dynamic>> donnees = [];
+  bool isLoading = true;
+  String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDonnees();
+  }
+
+  Future<void> _loadDonnees() async {
+    try {
+      final data = await apiService.fetchSoldeEvolution();
+      setState(() {
+        donnees = data;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        error = e.toString();
+        isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return Card(
+        color: Color(0xFF17333F),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Center(
+            child: CircularProgressIndicator(color: Color(0xFF00A9A5)),
+          ),
+        ),
+      );
+    }
+
+    if (error != null) {
+      return Card(
+        color: Color(0xFF17333F),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Center(
+            child: Text(
+              'Erreur : $error',
+              style: TextStyle(color: Colors.redAccent),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Card(
       color: Color(0xFF17333F),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -78,9 +128,10 @@ class SoldeEvolutionWidget extends StatelessWidget {
                         show: true,
                         color: Color(0xFF00A9A5).withOpacity(0.2),
                       ),
-                      spots: donneesTest
-                          .map((point) => FlSpot(point['jour'].toDouble(),
-                              point['solde'].toDouble()))
+                      spots: donnees
+                          .map((point) => FlSpot(
+                              (point['jour'] as num).toDouble(),
+                              (point['solde'] as num).toDouble()))
                           .toList(),
                     ),
                   ],

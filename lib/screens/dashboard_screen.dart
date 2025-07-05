@@ -1,20 +1,24 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
-import 'package:intl/intl.dart';
-
-import '../widgets/otp_screen.dart'; // Import de la page OTP
-import '../widgets/phone_number_dialog.dart'; // Import du pop-up numéro
-
 import '../widgets/solde_widget.dart';
+import '../widgets/otp_screen.dart';
+import '../widgets/phone_number_dialog.dart';
 import '../widgets/graphique_widget.dart';
 import '../widgets/solde_evolution_widget.dart';
+import '../services/api_services.dart';
 
-// Dashboard principal
-class DashboardScreen extends StatelessWidget {
-  Future<Map<String, dynamic>> fetchSoldeData() async {
-    final String response = await rootBundle.loadString('assets/solde.json');
-    return json.decode(response);
+class DashboardScreen extends StatefulWidget {
+  @override
+  _DashboardScreenState createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  final ApiService apiService = ApiService();
+  late Future<Map<String, dynamic>> soldeFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    soldeFuture = apiService.fetchSolde();
   }
 
   @override
@@ -22,7 +26,7 @@ class DashboardScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text('Tableau de Bord')),
       body: FutureBuilder<Map<String, dynamic>>(
-        future: fetchSoldeData(),
+        future: soldeFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator());
@@ -36,14 +40,14 @@ class DashboardScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SoldeWidget(
-                    solde: (data['solde'] as num).toDouble(),
-                    dernierCredit: (data['dernierCredit'] as num).toDouble(),
+                    solde: data['solde'],
+                    dernierCredit: data['dernierCredit'],
                     onRecharge: () {
                       showDialog(
                         context: context,
                         builder: (_) => PhoneNumberDialog(
                           onValidPhone: (phone) {
-                            Navigator.pop(context); // Fermer le dialog
+                            Navigator.pop(context);
                             Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -77,7 +81,6 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
-// Widget MenuItem corrigé
 class MenuItem extends StatelessWidget {
   final IconData icon;
   final String title;
