@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import '../services/api_services.dart';
 
 class StationSelectionDialog extends StatefulWidget {
-  final void Function(String telephone, String nomGerant) onSelected;
+  final void Function(String telephone, String nomGerant, double montant)? onValider;
 
-  StationSelectionDialog({required this.onSelected});
+  StationSelectionDialog({this.onValider});
 
   @override
   _StationSelectionDialogState createState() => _StationSelectionDialogState();
@@ -16,6 +16,7 @@ class _StationSelectionDialogState extends State<StationSelectionDialog> {
   Map<String, dynamic>? selectedStation;
   bool isLoading = true;
   String? error;
+  final TextEditingController montantController = TextEditingController();
 
   @override
   void initState() {
@@ -41,70 +42,109 @@ class _StationSelectionDialogState extends State<StationSelectionDialog> {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return AlertDialog(
-        content: SizedBox(
-          height: 100,
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      );
-    }
-
-    if (error != null) {
-      return AlertDialog(
-        title: Text('Erreur'),
-        content: Text(error!),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Fermer'),
-          ),
-        ],
-      );
-    }
-
     return AlertDialog(
-      title: Text('Sélectionnez la station'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          DropdownButton<Map<String, dynamic>>(
-            isExpanded: true,
-            value: selectedStation,
-            items: stations.map((station) {
-              return DropdownMenuItem(
-                value: station,
-                child: Text(station['nom_station']),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                selectedStation = value;
-              });
-            },
-          ),
-          SizedBox(height: 16),
-          if (selectedStation != null) ...[
-            Text(
-              "Nom station : ${selectedStation!['nom_station']}",
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            Text("Nom gérant : ${selectedStation!['nom_gerant']}"),
-            Text("Téléphone : ${selectedStation!['telephone_gerant']}"),
-          ],
-        ],
+      backgroundColor: Color(0xFF17333F),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Text(
+        'Rechargement de station',
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
       ),
+      content: isLoading
+          ? SizedBox(
+              height: 100,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : error != null
+              ? Text(error!, style: TextStyle(color: Colors.red))
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DropdownButton<Map<String, dynamic>>(
+                      isExpanded: true,
+                      dropdownColor: Color(0xFF223C4A),
+                      value: selectedStation,
+                      items: stations.map((station) {
+                        return DropdownMenuItem(
+                          value: station,
+                          child: Text(
+                            station['nom_station'],
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          selectedStation = value;
+                        });
+                      },
+                    ),
+                    SizedBox(height: 16),
+                    if (selectedStation != null) ...[
+                      Text(
+                        "Nom station : ${selectedStation!['nom_station']}",
+                        style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        "Nom gérant : ${selectedStation!['nom_gerant']}",
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                      Text(
+                        "Téléphone : ${selectedStation!['telephone_gerant']}",
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    ],
+                    SizedBox(height: 24),
+                    TextField(
+                      controller: montantController,
+                      keyboardType: TextInputType.number,
+                      style: TextStyle(color: Colors.white, fontSize: 18),
+                      decoration: InputDecoration(
+                        labelText: "Montant à recharger",
+                        labelStyle: TextStyle(color: Colors.white70),
+                        filled: true,
+                        fillColor: Color(0xFF223C4A),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        prefixIcon: Icon(Icons.attach_money, color: Colors.white70),
+                      ),
+                    ),
+                  ],
+                ),
       actions: [
         TextButton(
-          onPressed: selectedStation == null
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+            backgroundColor: Color(0xFF00A9A5),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ),
+          onPressed: (selectedStation == null || montantController.text.isEmpty)
               ? null
               : () {
-                  widget.onSelected(
-                    selectedStation!['telephone_gerant'],
-                    selectedStation!['nom_gerant'],
-                  );
+                  final montant = double.tryParse(montantController.text.replaceAll(',', '.'));
+                  if (montant == null || montant <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Veuillez saisir un montant valide.")),
+                    );
+                    return;
+                  }
+                  // Appelle la logique de validation ici
+                  if (widget.onValider != null) {
+                    widget.onValider!(
+                      selectedStation!['telephone_gerant'],
+                      selectedStation!['nom_gerant'],
+                      montant,
+                    );
+                  }
+                  Navigator.pop(context);
                 },
-          child: Text('Envoyer OTP'),
+          child: Text('Valider', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text('Annuler', style: TextStyle(color: Colors.white54)),
         ),
       ],
     );

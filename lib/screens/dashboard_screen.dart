@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../widgets/solde_widget.dart';
-import '../widgets/otp_screen.dart';
 import '../widgets/station_selection_dialog.dart';
 import '../widgets/graphique_widget.dart';
 import '../widgets/solde_evolution_widget.dart';
@@ -25,25 +24,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     showDialog(
       context: context,
       builder: (_) => StationSelectionDialog(
-        onSelected: (telephone, nomGerant) async {
-          Navigator.pop(context); // Fermer le dialogue ici une seule fois
-
+        onValider: (telephone, nomGerant, montant) async {
           try {
-            bool success = await apiService.sendConfirmationCarburant(
+            bool success = await apiService.rechargerStation(
               telephone: telephone,
               nom: nomGerant,
+              montant: montant,
             );
+            Navigator.pop(context); // Ferme la boîte de dialogue seulement après
             if (success) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => OtpScreen(phone: telephone)),
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text("Rechargement effectué avec succès !")),
               );
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("Échec de l'envoi de l'OTP")),
+                SnackBar(content: Text("Échec du rechargement")),
               );
             }
           } catch (e) {
+            Navigator.pop(context);
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text("Erreur réseau ou serveur")),
             );

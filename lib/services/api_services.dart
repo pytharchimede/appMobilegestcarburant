@@ -94,4 +94,32 @@ class ApiService {
       throw Exception('Erreur lors de l\'envoi de la confirmation carburant');
     }
   }
+
+/**
+ * Enregistre un rechargement de station en BDD
+ */
+  Future<bool> rechargerStation({
+    required String telephone,
+    required String nom,
+    required double montant,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl?endpoint=confirmation_carburant'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'telephone': telephone,
+        'nom': nom,
+        'montant': montant,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      print('Réponse API confirmation_carburant: $data'); // Debug
+      return data['status'] == 'success';
+    } else {
+      print('Erreur HTTP ${response.statusCode}: ${response.body}'); // Debug
+      throw Exception('Erreur lors du rechargement de la station');
+    }
+  }
 }
