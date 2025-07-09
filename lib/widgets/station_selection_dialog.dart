@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/api_services.dart';
 
 class StationSelectionDialog extends StatefulWidget {
@@ -17,6 +18,7 @@ class _StationSelectionDialogState extends State<StationSelectionDialog> {
   bool isLoading = true;
   String? error;
   final TextEditingController montantController = TextEditingController();
+  String? montantError;
 
   @override
   void initState() {
@@ -42,6 +44,8 @@ class _StationSelectionDialogState extends State<StationSelectionDialog> {
 
   @override
   Widget build(BuildContext context) {
+    double? montant = double.tryParse(montantController.text);
+
     return AlertDialog(
       backgroundColor: Color(0xFF17333F),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -98,6 +102,9 @@ class _StationSelectionDialogState extends State<StationSelectionDialog> {
                     TextField(
                       controller: montantController,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
                       style: TextStyle(color: Colors.white, fontSize: 18),
                       decoration: InputDecoration(
                         labelText: "Montant à recharger",
@@ -107,8 +114,24 @@ class _StationSelectionDialogState extends State<StationSelectionDialog> {
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        prefixIcon: Icon(Icons.attach_money, color: Colors.white70),
+                        prefixIcon: Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Text(
+                            "XOF",
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                        errorText: montantController.text.isNotEmpty && (montant == null || montant < 5000)
+                            ? "Montant minimum autorisé : 5000 XOF"
+                            : null,
                       ),
+                      onChanged: (value) {
+                        setState(() {});
+                      },
                     ),
                   ],
                 ),
@@ -120,16 +143,12 @@ class _StationSelectionDialogState extends State<StationSelectionDialog> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           ),
-          onPressed: (selectedStation == null || montantController.text.isEmpty)
+          onPressed: (selectedStation == null ||
+                  montantController.text.isEmpty ||
+                  montant == null ||
+                  montant < 5000)
               ? null
               : () {
-                  final montant = double.tryParse(montantController.text.replaceAll(',', '.'));
-                  if (montant == null || montant <= 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text("Veuillez saisir un montant valide.")),
-                    );
-                    return;
-                  }
                   if (widget.onValider != null) {
                     widget.onValider!(
                       selectedStation!['telephone_gerant'],
