@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:gestion_carburant/screens/bon_detail_screen.dart';
 import '../services/api_services.dart';
 
 class HistoriqueBonsScreen extends StatefulWidget {
@@ -30,7 +31,10 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
     super.initState();
     _loadBons();
     _scrollController.addListener(() {
-      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100 && !isLoading && hasMore) {
+      if (_scrollController.position.pixels >=
+              _scrollController.position.maxScrollExtent - 100 &&
+          !isLoading &&
+          hasMore) {
         _loadBons();
       }
     });
@@ -83,7 +87,8 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
       builder: (context) => AlertDialog(
         backgroundColor: Color(0xFF17333F),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text("Filtres", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: Text("Filtres",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: SingleChildScrollView(
           child: Column(
             children: [
@@ -94,7 +99,8 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                   labelStyle: TextStyle(color: Colors.white70),
                   filled: true,
                   fillColor: Color(0xFF223C4A),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
                 style: TextStyle(color: Colors.white),
                 onChanged: (v) => selectedStation = v,
@@ -113,10 +119,12 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                           firstDate: DateTime(2020),
                           lastDate: DateTime.now(),
                         );
-                        if (picked != null) setState(() => selectedDebut = picked);
+                        if (picked != null)
+                          setState(() => selectedDebut = picked);
                       },
                       child: Container(
-                        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                        padding:
+                            EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                         decoration: BoxDecoration(
                           color: Color(0xFF223C4A),
                           borderRadius: BorderRadius.circular(12),
@@ -140,10 +148,12 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                           firstDate: DateTime(2020),
                           lastDate: DateTime.now(),
                         );
-                        if (picked != null) setState(() => selectedFin = picked);
+                        if (picked != null)
+                          setState(() => selectedFin = picked);
                       },
                       child: Container(
-                        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                        padding:
+                            EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                         decoration: BoxDecoration(
                           color: Color(0xFF223C4A),
                           borderRadius: BorderRadius.circular(12),
@@ -172,10 +182,12 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
                         fillColor: Color(0xFF223C4A),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                       onChanged: (v) => selectedMin = double.tryParse(v),
-                      controller: TextEditingController(text: selectedMin?.toString() ?? ''),
+                      controller: TextEditingController(
+                          text: selectedMin?.toString() ?? ''),
                     ),
                   ),
                   SizedBox(width: 8),
@@ -188,10 +200,12 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                         labelStyle: TextStyle(color: Colors.white70),
                         filled: true,
                         fillColor: Color(0xFF223C4A),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                       onChanged: (v) => selectedMax = double.tryParse(v),
-                      controller: TextEditingController(text: selectedMax?.toString() ?? ''),
+                      controller: TextEditingController(
+                          text: selectedMax?.toString() ?? ''),
                     ),
                   ),
                 ],
@@ -266,13 +280,15 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
               itemCount: bons.length + (hasMore ? 1 : 0),
               itemBuilder: (context, index) {
                 if (index >= bons.length) {
-                  return Center(child: Padding(
+                  return Center(
+                      child: Padding(
                     padding: EdgeInsets.all(16),
                     child: CircularProgressIndicator(),
                   ));
                 }
                 final bon = bons[index];
-                double montant = double.tryParse(bon['montant'].toString()) ?? 0;
+                double montant =
+                    double.tryParse(bon['montant'].toString()) ?? 0;
                 return Card(
                   color: Color(0xFF223C4A),
                   margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -283,11 +299,14 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                       children: [
                         Text(
                           bon['code_bon']?.toString() ?? '',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                         Text(
                           "${formatMontant.format(double.tryParse(bon['montant'].toString()) ?? 0)} XOF",
-                          style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              color: Colors.greenAccent,
+                              fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
@@ -309,7 +328,8 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                               style: TextStyle(color: Colors.white54),
                             ),
                             Spacer(),
-                            Icon(Icons.calendar_today, color: Colors.white54, size: 14),
+                            Icon(Icons.calendar_today,
+                                color: Colors.white54, size: 14),
                             SizedBox(width: 4),
                             Text(
                               bon['date_demande']?.toString() ?? '',
@@ -319,9 +339,15 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                         ),
                       ],
                     ),
-                    trailing: Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
+                    trailing: Icon(Icons.arrow_forward_ios,
+                        color: Colors.white54, size: 16),
                     onTap: () {
-                      // TODO: Afficher le détail du bon si besoin
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => BonDetailScreen(bon: bon),
+                        ),
+                      );
                     },
                   ),
                 );
