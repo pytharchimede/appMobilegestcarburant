@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import '../widgets/image_picker.dart';
 
-class ParcAutoScreen extends StatelessWidget {
-  final List<Map<String, dynamic>> autos = [
+class ParcAutoScreen extends StatefulWidget {
+  @override
+  State<ParcAutoScreen> createState() => _ParcAutoScreenState();
+}
+
+class _ParcAutoScreenState extends State<ParcAutoScreen> {
+  List<Map<String, dynamic>> autos = [
     {
       "plaque": "AB-123-CD",
       "marque": "Toyota",
@@ -34,7 +40,7 @@ class ParcAutoScreen extends StatelessWidget {
     },
   ];
 
-  final List<Map<String, dynamic>> engins = [
+  List<Map<String, dynamic>> engins = [
     {
       "nom": "Chargeuse Caterpillar",
       "type": "Engin de chantier",
@@ -138,6 +144,26 @@ class ParcAutoScreen extends StatelessWidget {
               )),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: Colors.green,
+        child: Icon(Icons.add),
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (_) => AddParcElementDialog(
+              onAdd: (element, isEngin) {
+                setState(() {
+                  if (isEngin) {
+                    engins.add(element);
+                  } else {
+                    autos.add(element);
+                  }
+                });
+              },
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -238,6 +264,42 @@ class EnginDetailDialog extends StatelessWidget {
         TextButton(
           child: Text("Fermer", style: TextStyle(color: Colors.white)),
           onPressed: () => Navigator.pop(context),
+        ),
+      ],
+    );
+  }
+}
+
+class AddParcElementDialog extends StatelessWidget {
+  final Function(Map<String, dynamic>, bool) onAdd;
+  const AddParcElementDialog({required this.onAdd});
+
+  @override
+  Widget build(BuildContext context) {
+    // Implémente l'interface pour ajouter un véhicule ou un engin
+    return AlertDialog(
+      backgroundColor: Color(0xFF223C4A),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text("Ajouter un élément au parc",
+          style: TextStyle(color: Colors.white)),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Champs pour les détails du véhicule ou de l'engin
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          child: Text("Annuler", style: TextStyle(color: Colors.white)),
+          onPressed: () => Navigator.pop(context),
+        ),
+        TextButton(
+          child: Text("Ajouter", style: TextStyle(color: Colors.white)),
+          onPressed: () {
+            // Récupère les données des champs et appelle onAdd
+          },
         ),
       ],
     );
