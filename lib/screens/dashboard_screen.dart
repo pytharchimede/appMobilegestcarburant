@@ -6,6 +6,7 @@ import '../widgets/solde_evolution_widget.dart';
 import '../services/api_services.dart';
 import 'historique_bons_screen.dart'; // Importer l'écran HistoriqueBonsScreen
 import 'demandes_en_attente_screen.dart'; // en haut du fichier
+import 'parc_auto_screen.dart'; // Importer l'écran ParcAutoScreen
 
 class DashboardScreen extends StatefulWidget {
   @override
@@ -103,6 +104,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         context,
                         MaterialPageRoute(
                             builder: (_) => DemandesEnAttenteScreen()),
+                      );
+                    },
+                  ),
+                  MenuItem(
+                    icon: Icons.directions_car,
+                    title: "Gestion du parc automobile",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => ParcAutoScreen()),
                       );
                     },
                   ),
