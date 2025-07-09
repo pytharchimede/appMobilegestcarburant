@@ -5,6 +5,7 @@ import '../widgets/graphique_widget.dart';
 import '../widgets/solde_evolution_widget.dart';
 import '../services/api_services.dart';
 import 'historique_bons_screen.dart'; // Importer l'écran HistoriqueBonsScreen
+import 'demandes_en_attente_screen.dart'; // en haut du fichier
 
 class DashboardScreen extends StatefulWidget {
   @override
@@ -85,10 +86,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   SoldeEvolutionWidget(),
                   SizedBox(height: 20),
                   MenuItem(
-                      icon: Icons.receipt_long, title: "Historique des bons"),
+                    icon: Icons.receipt_long,
+                    title: "Historique des bons",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => HistoriqueBonsScreen()),
+                      );
+                    },
+                  ),
                   MenuItem(
-                      icon: Icons.pending_actions,
-                      title: "Demandes en attente"),
+                    icon: Icons.pending_actions,
+                    title: "Demandes en attente",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => DemandesEnAttenteScreen()),
+                      );
+                    },
+                  ),
                   MenuItem(icon: Icons.bar_chart, title: "Statistiques"),
                   SizedBox(height: 100),
                 ],
@@ -104,8 +121,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 class MenuItem extends StatelessWidget {
   final IconData icon;
   final String title;
+  final VoidCallback? onTap; // Ajoute ce paramètre
 
-  const MenuItem({required this.icon, required this.title});
+  const MenuItem({required this.icon, required this.title, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -114,14 +132,8 @@ class MenuItem extends StatelessWidget {
       child: ListTile(
         leading: Icon(icon, color: Colors.white),
         title: Text(title, style: TextStyle(color: Colors.white)),
-        trailing:
-            Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => HistoriqueBonsScreen()),
-          );
-        },
+        trailing: Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
+        onTap: onTap, // Utilise le onTap passé en paramètre
       ),
     );
   }

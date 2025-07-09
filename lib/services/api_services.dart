@@ -168,4 +168,24 @@ class ApiService {
       throw Exception('Erreur lors du chargement de l\'historique des bons');
     }
   }
+
+/**
+ * Récupère les demandes de carburant en attente.
+ * Retourne une liste de maps avec les informations des demandes.
+ */
+  Future<List<Map<String, dynamic>>> fetchDemandesEnAttente() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl?endpoint=demandes_carburant_attente'),
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(data['message'] ?? "Erreur lors du chargement des demandes");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des demandes");
+    }
+  }
 }
