@@ -31,11 +31,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               nom: nomGerant,
               montant: montant,
             );
-            Navigator.pop(context); // Ferme la boîte de dialogue seulement après
+            Navigator.pop(context); // Ferme la boîte de dialogue ici SEULEMENT
             if (success) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text("Rechargement effectué avec succès !")),
               );
+              setState(() {
+                soldeFuture = apiService.fetchSolde();
+              });
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text("Échec du rechargement")),

@@ -130,7 +130,6 @@ class _StationSelectionDialogState extends State<StationSelectionDialog> {
                     );
                     return;
                   }
-                  // Appelle la logique de validation ici
                   if (widget.onValider != null) {
                     widget.onValider!(
                       selectedStation!['telephone_gerant'],
@@ -138,7 +137,6 @@ class _StationSelectionDialogState extends State<StationSelectionDialog> {
                       montant,
                     );
                   }
-                  Navigator.pop(context);
                 },
           child: Text('Valider', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         ),
