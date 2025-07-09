@@ -4,6 +4,7 @@ import '../widgets/station_selection_dialog.dart';
 import '../widgets/graphique_widget.dart';
 import '../widgets/solde_evolution_widget.dart';
 import '../services/api_services.dart';
+import 'historique_bons_screen.dart'; // Importer l'écran HistoriqueBonsScreen
 
 class DashboardScreen extends StatefulWidget {
   @override
@@ -116,7 +117,10 @@ class MenuItem extends StatelessWidget {
         trailing:
             Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
         onTap: () {
-          // TODO: Ajouter navigation ou action spécifique
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => HistoriqueBonsScreen()),
+          );
         },
       ),
     );

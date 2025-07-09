@@ -122,4 +122,50 @@ class ApiService {
       throw Exception('Erreur lors du rechargement de la station');
     }
   }
+
+/**
+ * Récupère l'historique des bons avec pagination et filtres
+ */
+  Future<Map<String, dynamic>> fetchBons({
+    int page = 1,
+    String? station,
+    DateTime? dateDebut,
+    DateTime? dateFin,
+    double? montantMin,
+    double? montantMax,
+  }) async {
+    final Map<String, dynamic> params = {
+      'endpoint': 'historique_bons',
+      'page': page.toString(),
+      if (station != null && station.isNotEmpty) 'station': station,
+      if (dateDebut != null) 'date_debut': dateDebut.toIso8601String().substring(0, 10),
+      if (dateFin != null) 'date_fin': dateFin.toIso8601String().substring(0, 10),
+      if (montantMin != null) 'montant_min': montantMin.toString(),
+      if (montantMax != null) 'montant_max': montantMax.toString(),
+    };
+
+    final uri = Uri.parse(baseUrl).replace(queryParameters: params);
+
+    print('URL appelée : $uri');
+
+    final response = await http.get(uri);
+    print('Réponse brute historique_bons: ${response.body}'); // Ajoute ceci
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        final d = data['data'];
+        return {
+          'bons': List<Map<String, dynamic>>.from(d['bons']),
+          'montantTotal': (d['montantTotal'] ?? 0).toDouble(),
+          'hasMore': d['hasMore'] ?? false,
+        };
+      } else {
+        throw Exception(data['message'] ??
+            "Erreur lors du chargement de l'historique des bons");
+      }
+    } else {
+      throw Exception('Erreur lors du chargement de l\'historique des bons');
+    }
+  }
 }

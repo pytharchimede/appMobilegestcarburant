@@ -103,7 +103,7 @@ class _GraphiqueWidgetState extends State<GraphiqueWidget> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "Niveau de carburant utilisé ce mois",
+                    "Niveau de carburant utilisé",
                     style: TextStyle(color: Colors.white70, fontSize: 16),
                   ),
                   SizedBox(height: 8),
