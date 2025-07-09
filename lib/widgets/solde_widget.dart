@@ -36,7 +36,8 @@ class SoldeWidget extends StatelessWidget {
                       fontSize: 28,
                       fontWeight: FontWeight.bold)),
               SizedBox(height: 4),
-              Text('+ ${formatMontant.format(dernierCredit)} FCFA (consommé)',
+              Text(
+                  '+ ${formatMontant.format(dernierCredit)} FCFA (Dernier rechargement)',
                   style: TextStyle(color: Colors.greenAccent)),
               SizedBox(height: 16),
               SizedBox(
