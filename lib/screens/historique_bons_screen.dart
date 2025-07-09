@@ -278,23 +278,45 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                   margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: ListTile(
                     leading: Icon(Icons.receipt, color: Colors.white),
-                    title: Text(
-                      bon['nom_station']?.toString() ?? 'Station inconnue',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    title: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          bon['code_bon']?.toString() ?? '',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          "${formatMontant.format(double.tryParse(bon['montant'].toString()) ?? 0)} XOF",
+                          style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold),
+                        ),
+                      ],
                     ),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        SizedBox(height: 4),
                         Text(
-                          "Montant : ${formatMontant.format(montant)} XOF",
+                          bon['motif']?.toString() ?? '',
                           style: TextStyle(color: Colors.white70),
                         ),
-                        Text(
-                          "Date : ${bon['date_demande'] ?? ''}",
-                          style: TextStyle(color: Colors.white54),
+                        SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Icon(Icons.person, color: Colors.white54, size: 16),
+                            SizedBox(width: 4),
+                            Text(
+                              bon['nom_beneficiaire']?.toString() ?? '',
+                              style: TextStyle(color: Colors.white54),
+                            ),
+                            Spacer(),
+                            Icon(Icons.calendar_today, color: Colors.white54, size: 14),
+                            SizedBox(width: 4),
+                            Text(
+                              bon['date_demande']?.toString() ?? '',
+                              style: TextStyle(color: Colors.white54),
+                            ),
+                          ],
                         ),
-                        if ((bon['nom_gerant'] ?? '').toString().isNotEmpty)
-                          Text("Gérant : ${bon['nom_gerant']}", style: TextStyle(color: Colors.white54)),
                       ],
                     ),
                     trailing: Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
