@@ -1,5 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import '../widgets/image_picker.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ParcAutoScreen extends StatefulWidget {
   @override
@@ -270,24 +271,144 @@ class EnginDetailDialog extends StatelessWidget {
   }
 }
 
-class AddParcElementDialog extends StatelessWidget {
+class AddParcElementDialog extends StatefulWidget {
   final Function(Map<String, dynamic>, bool) onAdd;
   const AddParcElementDialog({required this.onAdd});
 
   @override
+  State<AddParcElementDialog> createState() => _AddParcElementDialogState();
+}
+
+class _AddParcElementDialogState extends State<AddParcElementDialog> {
+  String type = "Véhicule";
+  final _formKey = GlobalKey<FormState>();
+  final Map<String, dynamic> data = {};
+  XFile? image;
+  List<Map<String, dynamic>> documents = [];
+
+  Future<void> pickImage() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery);
+    if (picked != null) setState(() => image = picked);
+  }
+
+  Future<void> pickDocImage(int index) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery);
+    if (picked != null) setState(() => documents[index]['url'] = picked);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Implémente l'interface pour ajouter un véhicule ou un engin
     return AlertDialog(
       backgroundColor: Color(0xFF223C4A),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Text("Ajouter un élément au parc",
-          style: TextStyle(color: Colors.white)),
+      title: Row(
+        children: [
+          Icon(
+            type == "Engin"
+                ? Icons.precision_manufacturing
+                : type == "Camion"
+                    ? Icons.local_shipping
+                    : Icons.directions_car,
+            color: Colors.greenAccent,
+          ),
+          SizedBox(width: 8),
+          Text(
+            "Ajouter un $type",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
       content: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Champs pour les détails du véhicule ou de l'engin
-          ],
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              DropdownButtonFormField<String>(
+                value: type,
+                dropdownColor: Color(0xFF223C4A),
+                decoration: InputDecoration(
+                  labelText: "Type",
+                  labelStyle: TextStyle(color: Colors.white),
+                ),
+                items: ["Véhicule", "Camion", "Engin"]
+                    .map((e) => DropdownMenuItem(
+                          value: e,
+                          child: Text(e, style: TextStyle(color: Colors.white)),
+                        ))
+                    .toList(),
+                onChanged: (val) {
+                  setState(() {
+                    type = val!;
+                    documents.clear();
+                  });
+                },
+              ),
+              SizedBox(height: 12),
+              GestureDetector(
+                onTap: pickImage,
+                child: CircleAvatar(
+                  radius: 40,
+                  backgroundColor: Colors.white10,
+                  backgroundImage:
+                      image != null ? FileImage(File(image!.path)) : null,
+                  child: image == null
+                      ? Icon(Icons.camera_alt, color: Colors.white54, size: 36)
+                      : null,
+                ),
+              ),
+              SizedBox(height: 12),
+              ..._buildFields(),
+              SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text("Documents :", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+              ...documents.asMap().entries.map((entry) {
+                int i = entry.key;
+                var doc = entry.value;
+                return Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        initialValue: doc['type'],
+                        decoration: InputDecoration(
+                          labelText: "Type de document",
+                          labelStyle: TextStyle(color: Colors.white),
+                        ),
+                        style: TextStyle(color: Colors.white),
+                        onChanged: (val) => doc['type'] = val,
+                        validator: (val) => val == null || val.isEmpty ? "Obligatoire" : null,
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.attach_file, color: Colors.white),
+                      onPressed: () => pickDocImage(i),
+                    ),
+                    if (doc['url'] != null)
+                      Icon(Icons.check_circle, color: Colors.green),
+                    IconButton(
+                      icon: Icon(Icons.delete, color: Colors.red),
+                      onPressed: () {
+                        setState(() => documents.removeAt(i));
+                      },
+                    ),
+                  ],
+                );
+              }),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  icon: Icon(Icons.add, color: Colors.white),
+                  label: Text("Ajouter un document", style: TextStyle(color: Colors.white)),
+                  onPressed: () {
+                    setState(() => documents.add({"type": "", "url": null}));
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
       actions: [
@@ -295,13 +416,58 @@ class AddParcElementDialog extends StatelessWidget {
           child: Text("Annuler", style: TextStyle(color: Colors.white)),
           onPressed: () => Navigator.pop(context),
         ),
-        TextButton(
-          child: Text("Ajouter", style: TextStyle(color: Colors.white)),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+          child: Text("Ajouter"),
           onPressed: () {
-            // Récupère les données des champs et appelle onAdd
+            if (_formKey.currentState!.validate()) {
+              data['type'] = type;
+              data['photo_url'] = image;
+              data['documents'] = documents;
+              widget.onAdd(data, type == "Engin");
+              Navigator.pop(context);
+            }
           },
         ),
       ],
+    );
+  }
+
+  List<Widget> _buildFields() {
+    switch (type) {
+      case "Véhicule":
+      case "Camion":
+        return [
+          _textField("Plaque", "plaque"),
+          _textField("Marque", "marque"),
+          _textField("Modèle", "modele"),
+          _textField("Chauffeur", "chauffeur"),
+          _textField("Permis", "permis"),
+          _textField("Carte grise", "carte_grise"),
+          _textField("Assurance", "assurance"),
+        ];
+      case "Engin":
+        return [
+          _textField("Nom", "nom"),
+          _textField("Type d'engin", "type"),
+          _textField("N° série", "numero_serie"),
+          _textField("Carte grise", "carte_grise"),
+          _textField("Assurance", "assurance"),
+        ];
+      default:
+        return [];
+    }
+  }
+
+  Widget _textField(String label, String key) {
+    return TextFormField(
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: Colors.white),
+      ),
+      style: TextStyle(color: Colors.white),
+      validator: (val) => val == null || val.isEmpty ? "Champ requis" : null,
+      onChanged: (val) => data[key] = val,
     );
   }
 }
