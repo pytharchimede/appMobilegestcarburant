@@ -19,6 +19,11 @@ dependencies:
   flutter_launcher_icons: ^0.13.1
   qr_flutter: ^4.1.0
   image_picker: ^1.0.7
+  table_calendar: ^3.0.9
+  excel: ^2.1.0
+  pdf: ^3.10.8
+  path_provider: ^2.1.2
+  open_file: ^3.3.2
 
   cupertino_icons: ^1.0.8
   fl_chart: ^0.71.0

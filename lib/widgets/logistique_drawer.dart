@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../screens/planning_screen.dart';
 
 class LogistiqueDrawer extends StatelessWidget {
   @override
@@ -33,7 +34,10 @@ class LogistiqueDrawer extends StatelessWidget {
             ),
           ),
           _drawerSection("Planification", [
-            _drawerItem(context, Icons.event, "Planning", () {/* TODO */}),
+            _drawerItem(context, Icons.event, "Planning", () {
+              Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => PlanningScreen()));
+            }),
           ]),
           _drawerSection("Inventaires", [
             _drawerItem(context, Icons.inventory, "Matériel", () {/* TODO */}),
