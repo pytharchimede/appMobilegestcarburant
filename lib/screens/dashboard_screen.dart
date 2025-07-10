@@ -7,6 +7,7 @@ import '../services/api_services.dart';
 import 'historique_bons_screen.dart'; // Importer l'écran HistoriqueBonsScreen
 import 'demandes_en_attente_screen.dart'; // en haut du fichier
 import 'parc_auto_screen.dart'; // Importer l'écran ParcAutoScreen
+import '../widgets/logistique_drawer.dart';
 
 class DashboardScreen extends StatefulWidget {
   @override
@@ -61,7 +62,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Tableau de Bord')),
+      appBar: AppBar(
+        backgroundColor: Color(0xFF17333F),
+        title: Row(
+          children: [
+            Icon(Icons.local_shipping, color: Colors.greenAccent),
+            SizedBox(width: 8),
+            Text(
+              'Logistique Pro',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Builder(
+            builder: (context) => IconButton(
+              icon: Icon(Icons.menu, color: Colors.white),
+              onPressed: () => Scaffold.of(context).openEndDrawer(),
+            ),
+          ),
+        ],
+      ),
+      endDrawer: LogistiqueDrawer(),
       body: FutureBuilder<Map<String, dynamic>>(
         future: soldeFuture,
         builder: (context, snapshot) {
@@ -92,7 +118,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => HistoriqueBonsScreen()),
+                        MaterialPageRoute(
+                            builder: (_) => HistoriqueBonsScreen()),
                       );
                     },
                   ),
@@ -143,7 +170,8 @@ class MenuItem extends StatelessWidget {
       child: ListTile(
         leading: Icon(icon, color: Colors.white),
         title: Text(title, style: TextStyle(color: Colors.white)),
-        trailing: Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
+        trailing:
+            Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
         onTap: onTap, // Utilise le onTap passé en paramètre
       ),
     );
