@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../screens/planning_screen.dart';
 import '../screens/rapport_journalier_screen.dart';
 import '../screens/materiel_screen.dart';
+import '../screens/materiaux_outils_screen.dart';
+import '../screens/materiel_bureau_screen.dart';
+import '../screens/bon_entree_screen.dart';
+import '../screens/bon_sortie_screen.dart';
 
 class LogistiqueDrawer extends StatelessWidget {
   @override
@@ -56,17 +60,35 @@ class LogistiqueDrawer extends StatelessWidget {
             }),
             _drawerItem(
                 context, Icons.precision_manufacturing, "Matériaux & Outils",
-                () {/* TODO */}),
+                () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => MateriauxOutilsScreen()),
+              );
+            }),
             _drawerItem(context, Icons.desktop_windows, "Matériel de bureau",
-                () {/* TODO */}),
+                () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => MaterielBureauScreen()),
+              );
+            }),
           ]),
           _drawerSection("Stocks", [
             _drawerItem(
                 context, Icons.stacked_bar_chart, "Valorisation des stocks",
                 () {/* TODO */}),
-            _drawerItem(context, Icons.input, "Bons d'entrée", () {/* TODO */}),
+            _drawerItem(context, Icons.input, "Bons d'entrée", () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => BonEntreeScreen()),
+              );
+            }),
             _drawerItem(context, Icons.output, "Bons de sortie", () {
-              /* TODO */
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => BonSortieScreen()),
+              );
             }),
           ]),
           Divider(color: Colors.white24),
