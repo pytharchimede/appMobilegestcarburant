@@ -55,82 +55,85 @@ class _DemandesEnAttenteScreenState extends State<DemandesEnAttenteScreen> {
                   itemBuilder: (context, index) {
                     final demande = demandes[index];
                     return Card(
-                      color:
-                          Color(0xFFFFA726), // Orange pour signaler l'attente
-                      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: ListTile(
-                        leading: Icon(Icons.hourglass_top, color: Colors.white),
-                        title: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              demande['code_bon']?.toString() ?? '',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              "${demande['montant'] ?? ''} XOF",
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(height: 4),
-                            Text(
-                              demande['motif']?.toString() ?? '',
-                              style: TextStyle(color: Colors.white70),
-                            ),
-                            SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Icon(Icons.person,
-                                    color: Colors.white54, size: 16),
-                                SizedBox(width: 4),
-                                Text(
-                                  demande['nom_beneficiaire']?.toString() ?? '',
-                                  style: TextStyle(color: Colors.white54),
-                                ),
-                                Spacer(),
-                                Icon(Icons.calendar_today,
-                                    color: Colors.white54, size: 14),
-                                SizedBox(width: 4),
-                                Text(
-                                  demande['date_demande']?.toString() ?? '',
-                                  style: TextStyle(color: Colors.white54),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        trailing: Icon(Icons.arrow_forward_ios,
-                            color: Colors.white54, size: 16),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => DemandeDetailScreen(
-                                demande: demande,
-                                onAccept: () {
-                                  // Appelle ton API pour accepter
-                                  Navigator.pop(context);
-                                  _loadDemandes();
-                                },
-                                onRefuse: () {
-                                  // Appelle ton API pour refuser
-                                  Navigator.pop(context);
-                                  _loadDemandes();
-                                },
+                        color:
+                            Color(0xFFFFA726), // Orange pour signaler l'attente
+                        margin:
+                            EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: ListTile(
+                          leading:
+                              Icon(Icons.hourglass_top, color: Colors.white),
+                          title: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                demande['num_fiche']?.toString() ?? '',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold),
                               ),
-                            ),
-                          );
-                        },
-                      ),
-                    );
+                              Text(
+                                "${demande['montant_fiche'] ?? ''} XOF",
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(height: 4),
+                              Text(
+                                demande['precision_fiche']?.toString() ?? '',
+                                style: TextStyle(color: Colors.white70),
+                              ),
+                              SizedBox(height: 2),
+                              Row(
+                                children: [
+                                  Icon(Icons.person,
+                                      color: Colors.white54, size: 16),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    demande['beficiaire_fiche']?.toString() ??
+                                        '',
+                                    style: TextStyle(color: Colors.white54),
+                                  ),
+                                  Spacer(),
+                                  Icon(Icons.calendar_today,
+                                      color: Colors.white54, size: 14),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    demande['date_creat_fiche']?.toString() ??
+                                        '',
+                                    style: TextStyle(color: Colors.white54),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          trailing: Icon(Icons.arrow_forward_ios,
+                              color: Colors.white54, size: 16),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => DemandeDetailScreen(
+                                  demande: demande,
+                                  onAccept: () {
+                                    // Appelle ton API pour accepter
+                                    Navigator.pop(context);
+                                    _loadDemandes();
+                                  },
+                                  onRefuse: () {
+                                    // Appelle ton API pour refuser
+                                    Navigator.pop(context);
+                                    _loadDemandes();
+                                  },
+                                ),
+                              ),
+                            );
+                          },
+                        ));
                   },
                 ),
     );
@@ -150,7 +153,8 @@ class DemandeDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final montant = double.tryParse(demande['montant'].toString()) ?? 0;
+    final montant =
+        double.tryParse(demande['montant_fiche']?.toString() ?? '0') ?? 0;
 
     return Scaffold(
       backgroundColor: Color(0xFF17333F),
@@ -174,7 +178,7 @@ class DemandeDetailScreen extends StatelessWidget {
                   Icon(Icons.hourglass_top, color: Colors.white, size: 48),
                   SizedBox(height: 16),
                   Text(
-                    demande['code_bon']?.toString() ?? '',
+                    demande['num_fiche']?.toString() ?? '',
                     style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -182,15 +186,13 @@ class DemandeDetailScreen extends StatelessWidget {
                         letterSpacing: 2),
                   ),
                   Divider(color: Colors.white24, height: 32),
-                  _infoRow("Nom du demandeur", demande['nom_beneficiaire']),
+                  _infoRow("Nom du bénéficiaire", demande['beficiaire_fiche']),
                   _infoRow("Montant", "${montant.toStringAsFixed(0)} XOF"),
-                  _infoRow("Date", demande['date_demande']),
-                  _infoRow("Motif", demande['motif']),
-                  _infoRow("Véhicule", demande['vehicule']),
-                  _infoRow("Quantité", demande['quantite']),
+                  _infoRow("Date", demande['date_creat_fiche']),
+                  _infoRow("Motif", demande['precision_fiche']),
                   _infoRow("Numéro fiche", demande['num_fiche']),
-                  _infoRow("DG", demande['dg_nom']),
-                  _infoRow("Créé le", demande['created_at']),
+                  _infoRow("Entreprise", demande['entreprise']),
+                  // Ajoute d'autres champs si besoin
                   SizedBox(height: 24),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
