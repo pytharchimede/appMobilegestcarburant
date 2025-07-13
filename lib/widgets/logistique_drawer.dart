@@ -7,6 +7,7 @@ import '../screens/materiel_bureau_screen.dart';
 import '../screens/bon_entree_screen.dart';
 import '../screens/bon_sortie_screen.dart';
 import '../screens/valorisation_stocks_screen.dart';
+import '../screens/inventaire_stock_screen.dart';
 
 class LogistiqueDrawer extends StatelessWidget {
   @override
@@ -72,6 +73,12 @@ class LogistiqueDrawer extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => MaterielBureauScreen()),
+              );
+            }),
+            _drawerItem(context, Icons.qr_code, "Inventaire de stock", () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => InventaireStockScreen()),
               );
             }),
           ]),
