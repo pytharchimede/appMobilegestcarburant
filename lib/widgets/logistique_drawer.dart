@@ -6,6 +6,7 @@ import '../screens/materiaux_outils_screen.dart';
 import '../screens/materiel_bureau_screen.dart';
 import '../screens/bon_entree_screen.dart';
 import '../screens/bon_sortie_screen.dart';
+import '../screens/valorisation_stocks_screen.dart';
 
 class LogistiqueDrawer extends StatelessWidget {
   @override
@@ -77,7 +78,12 @@ class LogistiqueDrawer extends StatelessWidget {
           _drawerSection("Stocks", [
             _drawerItem(
                 context, Icons.stacked_bar_chart, "Valorisation des stocks",
-                () {/* TODO */}),
+                () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ValorisationStocksScreen()),
+              );
+            }),
             _drawerItem(context, Icons.input, "Bons d'entrée", () {
               Navigator.push(
                 context,
