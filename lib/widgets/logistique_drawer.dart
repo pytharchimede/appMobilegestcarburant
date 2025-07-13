@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../screens/planning_screen.dart';
+import '../screens/rapport_journalier_screen.dart';
+import '../screens/materiel_screen.dart';
 
 class LogistiqueDrawer extends StatelessWidget {
   @override
@@ -38,9 +40,20 @@ class LogistiqueDrawer extends StatelessWidget {
               Navigator.push(
                   context, MaterialPageRoute(builder: (_) => PlanningScreen()));
             }),
+            _drawerItem(context, Icons.assignment, "Rapport journalier", () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => RapportJournalierScreen()),
+              );
+            }),
           ]),
           _drawerSection("Inventaires", [
-            _drawerItem(context, Icons.inventory, "Matériel", () {/* TODO */}),
+            _drawerItem(context, Icons.inventory, "Matériel", () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => MaterielScreen()),
+              );
+            }),
             _drawerItem(
                 context, Icons.precision_manufacturing, "Matériaux & Outils",
                 () {/* TODO */}),
