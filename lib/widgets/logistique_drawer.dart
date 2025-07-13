@@ -8,6 +8,7 @@ import '../screens/bon_entree_screen.dart';
 import '../screens/bon_sortie_screen.dart';
 import '../screens/valorisation_stocks_screen.dart';
 import '../screens/inventaire_stock_screen.dart';
+import '../screens/parametres_screen.dart';
 
 class LogistiqueDrawer extends StatelessWidget {
   @override
@@ -108,7 +109,12 @@ class LogistiqueDrawer extends StatelessWidget {
           ListTile(
             leading: Icon(Icons.settings, color: Colors.white70),
             title: Text("Paramètres", style: TextStyle(color: Colors.white)),
-            onTap: () {/* TODO */},
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ParametresScreen()),
+              );
+            },
           ),
         ],
       ),
