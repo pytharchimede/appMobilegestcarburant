@@ -86,7 +86,7 @@ class _ParcAutoScreenState extends State<ParcAutoScreen> {
                           children: [
                             Text("Plaque : ${auto['plaque']}",
                                 style: TextStyle(color: Colors.white70)),
-                            Text("Chauffeur : ${auto['chauffeur']}",
+                            Text("Chauffeur : ${auto['chauffeur_nom'] ?? ''}",
                                 style: TextStyle(color: Colors.white70)),
                           ],
                         ),
@@ -173,7 +173,7 @@ class AutoDetailDialog extends StatelessWidget {
               style: TextStyle(color: Colors.white70)),
           Text("Modèle : ${auto['modele']}",
               style: TextStyle(color: Colors.white70)),
-          Text("Chauffeur : ${auto['chauffeur']}",
+          Text("Chauffeur : ${auto['chauffeur_nom']}",
               style: TextStyle(color: Colors.white70)),
           Text("Permis : ${auto['permis']}",
               style: TextStyle(color: Colors.white70)),
@@ -367,7 +367,8 @@ class _AddParcElementDialogState extends State<AddParcElementDialog> {
                       items: ["Véhicule", "Camion", "Engin"]
                           .map((e) => DropdownMenuItem(
                                 value: e,
-                                child: Text(e, style: TextStyle(color: Colors.white)),
+                                child: Text(e,
+                                    style: TextStyle(color: Colors.white)),
                               ))
                           .toList(),
                       onChanged: (val) {
@@ -383,9 +384,11 @@ class _AddParcElementDialogState extends State<AddParcElementDialog> {
                       child: CircleAvatar(
                         radius: 40,
                         backgroundColor: Colors.white10,
-                        backgroundImage: image != null ? FileImage(File(image!.path)) : null,
+                        backgroundImage:
+                            image != null ? FileImage(File(image!.path)) : null,
                         child: image == null
-                            ? Icon(Icons.camera_alt, color: Colors.white54, size: 36)
+                            ? Icon(Icons.camera_alt,
+                                color: Colors.white54, size: 36)
                             : null,
                       ),
                     ),
@@ -396,7 +399,8 @@ class _AddParcElementDialogState extends State<AddParcElementDialog> {
                       alignment: Alignment.centerLeft,
                       child: Text("Documents :",
                           style: TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.bold)),
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold)),
                     ),
                     ...documents.asMap().entries.map((entry) {
                       int i = entry.key;
@@ -412,8 +416,9 @@ class _AddParcElementDialogState extends State<AddParcElementDialog> {
                               ),
                               style: TextStyle(color: Colors.white),
                               onChanged: (val) => doc['type'] = val,
-                              validator: (val) =>
-                                  val == null || val.isEmpty ? "Obligatoire" : null,
+                              validator: (val) => val == null || val.isEmpty
+                                  ? "Obligatoire"
+                                  : null,
                             ),
                           ),
                           IconButton(
@@ -438,7 +443,8 @@ class _AddParcElementDialogState extends State<AddParcElementDialog> {
                         label: Text("Ajouter un document",
                             style: TextStyle(color: Colors.white)),
                         onPressed: () {
-                          setState(() => documents.add({"type": "", "url": null}));
+                          setState(
+                              () => documents.add({"type": "", "url": null}));
                         },
                       ),
                     ),
@@ -458,10 +464,13 @@ class _AddParcElementDialogState extends State<AddParcElementDialog> {
             if (_formKey.currentState!.validate()) {
               data['type'] = type;
               data['photo_url'] = image?.path ?? "";
-              data['documents'] = documents.map((doc) => {
-                "type": doc['type'],
-                "url": doc['url'] is XFile ? doc['url'].path : doc['url']
-              }).toList();
+              data['documents'] = documents
+                  .map((doc) => {
+                        "type": doc['type'],
+                        "url":
+                            doc['url'] is XFile ? doc['url'].path : doc['url']
+                      })
+                  .toList();
               if (type == "Véhicule" || type == "Camion") {
                 data['chauffeur_nom'] = selectedChauffeur?['nom'] ?? "";
                 data['marque'] = selectedMarque?['nom'] ?? "";
@@ -496,7 +505,8 @@ class _AddParcElementDialogState extends State<AddParcElementDialog> {
             items: marques
                 .map((m) => DropdownMenuItem(
                       value: m,
-                      child: Text(m['nom'], style: TextStyle(color: Colors.white)),
+                      child:
+                          Text(m['nom'], style: TextStyle(color: Colors.white)),
                     ))
                 .toList(),
             onChanged: (val) => setState(() => selectedMarque = val),
@@ -512,7 +522,8 @@ class _AddParcElementDialogState extends State<AddParcElementDialog> {
             items: chauffeurs
                 .map((c) => DropdownMenuItem(
                       value: c,
-                      child: Text(c['nom'], style: TextStyle(color: Colors.white)),
+                      child:
+                          Text(c['nom'], style: TextStyle(color: Colors.white)),
                     ))
                 .toList(),
             onChanged: (val) => setState(() => selectedChauffeur = val),
