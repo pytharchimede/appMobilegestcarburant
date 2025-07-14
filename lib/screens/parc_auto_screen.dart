@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../services/api_services.dart';
 
 class ParcAutoScreen extends StatefulWidget {
   @override
@@ -8,65 +9,51 @@ class ParcAutoScreen extends StatefulWidget {
 }
 
 class _ParcAutoScreenState extends State<ParcAutoScreen> {
-  List<Map<String, dynamic>> autos = [
-    {
-      "plaque": "AB-123-CD",
-      "marque": "Toyota",
-      "modele": "Hilux",
-      "chauffeur": "Kouassi Jean",
-      "permis": "PERM-2025-001",
-      "carte_grise": "CG-2024-001",
-      "assurance": "AXA - 12/2025",
-      "photo_url": null,
-      "documents": [
-        {"type": "Permis", "url": null},
-        {"type": "Carte grise", "url": null},
-        {"type": "Assurance", "url": null},
-      ]
-    },
-    {
-      "plaque": "CD-456-EF",
-      "marque": "Hyundai",
-      "modele": "Santa Fe",
-      "chauffeur": "Traoré Fatou",
-      "permis": "PERM-2024-002",
-      "carte_grise": "CG-2023-002",
-      "assurance": "NSIA - 08/2024",
-      "photo_url": null,
-      "documents": [
-        {"type": "Permis", "url": null},
-        {"type": "Carte grise", "url": null},
-        {"type": "Assurance", "url": null},
-      ]
-    },
-  ];
+  List<Map<String, dynamic>> autos = [];
+  List<Map<String, dynamic>> engins = [];
+  bool isLoading = true;
 
-  List<Map<String, dynamic>> engins = [
-    {
-      "nom": "Chargeuse Caterpillar",
-      "type": "Engin de chantier",
-      "numero_serie": "CAT-ENG-001",
-      "carte_grise": "CG-ENG-001",
-      "assurance": "SUNU - 10/2025",
-      "photo_url": null,
-      "documents": [
-        {"type": "Carte grise", "url": null},
-        {"type": "Assurance", "url": null},
-      ]
-    },
-    {
-      "nom": "Tractopelle JCB",
-      "type": "Engin de chantier",
-      "numero_serie": "JCB-ENG-002",
-      "carte_grise": "CG-ENG-002",
-      "assurance": "NSIA - 03/2026",
-      "photo_url": null,
-      "documents": [
-        {"type": "Carte grise", "url": null},
-        {"type": "Assurance", "url": null},
-      ]
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadVehicules();
+  }
+
+  Future<void> _loadVehicules() async {
+    setState(() => isLoading = true);
+    try {
+      final api = ApiService();
+      final vehicules = await api.fetchVehicules(); // À ajouter dans ApiService
+      setState(() {
+        autos = vehicules
+            .where((v) => v['type'] == 'Véhicule' || v['type'] == 'Camion')
+            .toList();
+        engins = vehicules.where((v) => v['type'] == 'Engin').toList();
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Erreur chargement véhicules : $e")),
+      );
+    }
+    setState(() => isLoading = false);
+  }
+
+  Future<void> _ajouterVehicule(Map<String, dynamic> data, bool isEngin) async {
+    try {
+      final api = ApiService();
+      final ok = await api.ajouterVehicule(data); // À ajouter dans ApiService
+      if (ok) {
+        _loadVehicules();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Ajouté avec succès")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Erreur ajout : $e")),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,75 +63,78 @@ class _ParcAutoScreenState extends State<ParcAutoScreen> {
         backgroundColor: Color(0xFF17333F),
         title: Text("Parc automobile & engins"),
       ),
-      body: ListView(
-        padding: EdgeInsets.all(16),
-        children: [
-          Text("Véhicules",
-              style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18)),
-          ...autos.map((auto) => Card(
-                color: Color(0xFF223C4A),
-                margin: EdgeInsets.symmetric(vertical: 8),
-                child: ListTile(
-                  leading: Icon(Icons.directions_car, color: Colors.white),
-                  title: Text("${auto['marque']} ${auto['modele']}",
-                      style: TextStyle(color: Colors.white)),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Plaque : ${auto['plaque']}",
-                          style: TextStyle(color: Colors.white70)),
-                      Text("Chauffeur : ${auto['chauffeur']}",
-                          style: TextStyle(color: Colors.white70)),
-                    ],
-                  ),
-                  trailing: Icon(Icons.arrow_forward_ios,
-                      color: Colors.white54, size: 16),
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (_) => AutoDetailDialog(auto: auto),
-                    );
-                  },
-                ),
-              )),
-          SizedBox(height: 24),
-          Text("Engins",
-              style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18)),
-          ...engins.map((engin) => Card(
-                color: Color(0xFF223C4A),
-                margin: EdgeInsets.symmetric(vertical: 8),
-                child: ListTile(
-                  leading:
-                      Icon(Icons.precision_manufacturing, color: Colors.white),
-                  title: Text("${engin['nom']}",
-                      style: TextStyle(color: Colors.white)),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("Type : ${engin['type']}",
-                          style: TextStyle(color: Colors.white70)),
-                      Text("N° série : ${engin['numero_serie']}",
-                          style: TextStyle(color: Colors.white70)),
-                    ],
-                  ),
-                  trailing: Icon(Icons.arrow_forward_ios,
-                      color: Colors.white54, size: 16),
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (_) => EnginDetailDialog(engin: engin),
-                    );
-                  },
-                ),
-              )),
-        ],
-      ),
+      body: isLoading
+          ? Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: EdgeInsets.all(16),
+              children: [
+                Text("Véhicules",
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18)),
+                ...autos.map((auto) => Card(
+                      color: Color(0xFF223C4A),
+                      margin: EdgeInsets.symmetric(vertical: 8),
+                      child: ListTile(
+                        leading:
+                            Icon(Icons.directions_car, color: Colors.white),
+                        title: Text("${auto['marque']} ${auto['modele']}",
+                            style: TextStyle(color: Colors.white)),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Plaque : ${auto['plaque']}",
+                                style: TextStyle(color: Colors.white70)),
+                            Text("Chauffeur : ${auto['chauffeur']}",
+                                style: TextStyle(color: Colors.white70)),
+                          ],
+                        ),
+                        trailing: Icon(Icons.arrow_forward_ios,
+                            color: Colors.white54, size: 16),
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (_) => AutoDetailDialog(auto: auto),
+                          );
+                        },
+                      ),
+                    )),
+                SizedBox(height: 24),
+                Text("Engins",
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18)),
+                ...engins.map((engin) => Card(
+                      color: Color(0xFF223C4A),
+                      margin: EdgeInsets.symmetric(vertical: 8),
+                      child: ListTile(
+                        leading: Icon(Icons.precision_manufacturing,
+                            color: Colors.white),
+                        title: Text("${engin['nom']}",
+                            style: TextStyle(color: Colors.white)),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text("Type : ${engin['type']}",
+                                style: TextStyle(color: Colors.white70)),
+                            Text("N° série : ${engin['numero_serie']}",
+                                style: TextStyle(color: Colors.white70)),
+                          ],
+                        ),
+                        trailing: Icon(Icons.arrow_forward_ios,
+                            color: Colors.white54, size: 16),
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (_) => EnginDetailDialog(engin: engin),
+                          );
+                        },
+                      ),
+                    )),
+              ],
+            ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.green,
         child: Icon(Icons.add),
@@ -153,13 +143,7 @@ class _ParcAutoScreenState extends State<ParcAutoScreen> {
             context: context,
             builder: (_) => AddParcElementDialog(
               onAdd: (element, isEngin) {
-                setState(() {
-                  if (isEngin) {
-                    engins.add(element);
-                  } else {
-                    autos.add(element);
-                  }
-                });
+                _ajouterVehicule(element, isEngin);
               },
             ),
           );
@@ -286,6 +270,49 @@ class _AddParcElementDialogState extends State<AddParcElementDialog> {
   XFile? image;
   List<Map<String, dynamic>> documents = [];
 
+  // Pour les listes déroulantes
+  List<Map<String, dynamic>> chauffeurs = [];
+  List<Map<String, dynamic>> marques = [];
+  final List<String> typesEngin = [
+    "Pelle",
+    "Grue",
+    "Nacelle",
+    "Bulldozer",
+    "Tracteur",
+    "Compacteur",
+    "Autre"
+  ];
+  Map<String, dynamic>? selectedChauffeur;
+  Map<String, dynamic>? selectedMarque;
+  String? selectedTypeEngin;
+
+  bool loadingLists = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLists();
+  }
+
+  Future<void> _loadLists() async {
+    setState(() => loadingLists = true);
+    try {
+      final api = ApiService();
+      final ch = await api.fetchChauffeurs();
+      final mq = await api.fetchMarques();
+      setState(() {
+        chauffeurs = ch;
+        marques = mq;
+        selectedChauffeur = chauffeurs.isNotEmpty ? chauffeurs.first : null;
+        selectedMarque = marques.isNotEmpty ? marques.first : null;
+        selectedTypeEngin = typesEngin.first;
+      });
+    } catch (e) {
+      // ignore
+    }
+    setState(() => loadingLists = false);
+  }
+
   Future<void> pickImage() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);
@@ -320,97 +347,105 @@ class _AddParcElementDialogState extends State<AddParcElementDialog> {
           ),
         ],
       ),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            children: [
-              DropdownButtonFormField<String>(
-                value: type,
-                dropdownColor: Color(0xFF223C4A),
-                decoration: InputDecoration(
-                  labelText: "Type",
-                  labelStyle: TextStyle(color: Colors.white),
-                ),
-                items: ["Véhicule", "Camion", "Engin"]
-                    .map((e) => DropdownMenuItem(
-                          value: e,
-                          child: Text(e, style: TextStyle(color: Colors.white)),
-                        ))
-                    .toList(),
-                onChanged: (val) {
-                  setState(() {
-                    type = val!;
-                    documents.clear();
-                  });
-                },
-              ),
-              SizedBox(height: 12),
-              GestureDetector(
-                onTap: pickImage,
-                child: CircleAvatar(
-                  radius: 40,
-                  backgroundColor: Colors.white10,
-                  backgroundImage:
-                      image != null ? FileImage(File(image!.path)) : null,
-                  child: image == null
-                      ? Icon(Icons.camera_alt, color: Colors.white54, size: 36)
-                      : null,
-                ),
-              ),
-              SizedBox(height: 12),
-              ..._buildFields(),
-              SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text("Documents :", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-              ...documents.asMap().entries.map((entry) {
-                int i = entry.key;
-                var doc = entry.value;
-                return Row(
+      content: loadingLists
+          ? Padding(
+              padding: const EdgeInsets.all(32.0),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : SingleChildScrollView(
+              child: Form(
+                key: _formKey,
+                child: Column(
                   children: [
-                    Expanded(
-                      child: TextFormField(
-                        initialValue: doc['type'],
-                        decoration: InputDecoration(
-                          labelText: "Type de document",
-                          labelStyle: TextStyle(color: Colors.white),
-                        ),
-                        style: TextStyle(color: Colors.white),
-                        onChanged: (val) => doc['type'] = val,
-                        validator: (val) => val == null || val.isEmpty ? "Obligatoire" : null,
+                    DropdownButtonFormField<String>(
+                      value: type,
+                      dropdownColor: Color(0xFF223C4A),
+                      decoration: InputDecoration(
+                        labelText: "Type",
+                        labelStyle: TextStyle(color: Colors.white),
                       ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.attach_file, color: Colors.white),
-                      onPressed: () => pickDocImage(i),
-                    ),
-                    if (doc['url'] != null)
-                      Icon(Icons.check_circle, color: Colors.green),
-                    IconButton(
-                      icon: Icon(Icons.delete, color: Colors.red),
-                      onPressed: () {
-                        setState(() => documents.removeAt(i));
+                      items: ["Véhicule", "Camion", "Engin"]
+                          .map((e) => DropdownMenuItem(
+                                value: e,
+                                child: Text(e, style: TextStyle(color: Colors.white)),
+                              ))
+                          .toList(),
+                      onChanged: (val) {
+                        setState(() {
+                          type = val!;
+                          documents.clear();
+                        });
                       },
                     ),
+                    SizedBox(height: 12),
+                    GestureDetector(
+                      onTap: pickImage,
+                      child: CircleAvatar(
+                        radius: 40,
+                        backgroundColor: Colors.white10,
+                        backgroundImage: image != null ? FileImage(File(image!.path)) : null,
+                        child: image == null
+                            ? Icon(Icons.camera_alt, color: Colors.white54, size: 36)
+                            : null,
+                      ),
+                    ),
+                    SizedBox(height: 12),
+                    ..._buildFields(),
+                    SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text("Documents :",
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                    ...documents.asMap().entries.map((entry) {
+                      int i = entry.key;
+                      var doc = entry.value;
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              initialValue: doc['type'],
+                              decoration: InputDecoration(
+                                labelText: "Type de document",
+                                labelStyle: TextStyle(color: Colors.white),
+                              ),
+                              style: TextStyle(color: Colors.white),
+                              onChanged: (val) => doc['type'] = val,
+                              validator: (val) =>
+                                  val == null || val.isEmpty ? "Obligatoire" : null,
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.attach_file, color: Colors.white),
+                            onPressed: () => pickDocImage(i),
+                          ),
+                          if (doc['url'] != null)
+                            Icon(Icons.check_circle, color: Colors.green),
+                          IconButton(
+                            icon: Icon(Icons.delete, color: Colors.red),
+                            onPressed: () {
+                              setState(() => documents.removeAt(i));
+                            },
+                          ),
+                        ],
+                      );
+                    }),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        icon: Icon(Icons.add, color: Colors.white),
+                        label: Text("Ajouter un document",
+                            style: TextStyle(color: Colors.white)),
+                        onPressed: () {
+                          setState(() => documents.add({"type": "", "url": null}));
+                        },
+                      ),
+                    ),
                   ],
-                );
-              }),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  icon: Icon(Icons.add, color: Colors.white),
-                  label: Text("Ajouter un document", style: TextStyle(color: Colors.white)),
-                  onPressed: () {
-                    setState(() => documents.add({"type": "", "url": null}));
-                  },
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
+            ),
       actions: [
         TextButton(
           child: Text("Annuler", style: TextStyle(color: Colors.white)),
@@ -422,8 +457,20 @@ class _AddParcElementDialogState extends State<AddParcElementDialog> {
           onPressed: () {
             if (_formKey.currentState!.validate()) {
               data['type'] = type;
-              data['photo_url'] = image;
-              data['documents'] = documents;
+              data['photo_url'] = image?.path ?? "";
+              data['documents'] = documents.map((doc) => {
+                "type": doc['type'],
+                "url": doc['url'] is XFile ? doc['url'].path : doc['url']
+              }).toList();
+              if (type == "Véhicule" || type == "Camion") {
+                data['chauffeur_nom'] = selectedChauffeur?['nom'] ?? "";
+                data['marque'] = selectedMarque?['nom'] ?? "";
+                // Ajoute les autres champs déjà gérés par _textField
+              }
+              if (type == "Engin") {
+                data['type_engin'] = selectedTypeEngin ?? "";
+                // Ajoute les autres champs déjà gérés par _textField
+              }
               widget.onAdd(data, type == "Engin");
               Navigator.pop(context);
             }
@@ -439,9 +486,37 @@ class _AddParcElementDialogState extends State<AddParcElementDialog> {
       case "Camion":
         return [
           _textField("Plaque", "plaque"),
-          _textField("Marque", "marque"),
+          DropdownButtonFormField<Map<String, dynamic>>(
+            value: selectedMarque,
+            dropdownColor: Color(0xFF223C4A),
+            decoration: InputDecoration(
+              labelText: "Marque",
+              labelStyle: TextStyle(color: Colors.white),
+            ),
+            items: marques
+                .map((m) => DropdownMenuItem(
+                      value: m,
+                      child: Text(m['nom'], style: TextStyle(color: Colors.white)),
+                    ))
+                .toList(),
+            onChanged: (val) => setState(() => selectedMarque = val),
+          ),
           _textField("Modèle", "modele"),
-          _textField("Chauffeur", "chauffeur"),
+          DropdownButtonFormField<Map<String, dynamic>>(
+            value: selectedChauffeur,
+            dropdownColor: Color(0xFF223C4A),
+            decoration: InputDecoration(
+              labelText: "Chauffeur",
+              labelStyle: TextStyle(color: Colors.white),
+            ),
+            items: chauffeurs
+                .map((c) => DropdownMenuItem(
+                      value: c,
+                      child: Text(c['nom'], style: TextStyle(color: Colors.white)),
+                    ))
+                .toList(),
+            onChanged: (val) => setState(() => selectedChauffeur = val),
+          ),
           _textField("Permis", "permis"),
           _textField("Carte grise", "carte_grise"),
           _textField("Assurance", "assurance"),
@@ -449,7 +524,21 @@ class _AddParcElementDialogState extends State<AddParcElementDialog> {
       case "Engin":
         return [
           _textField("Nom", "nom"),
-          _textField("Type d'engin", "type"),
+          DropdownButtonFormField<String>(
+            value: selectedTypeEngin,
+            dropdownColor: Color(0xFF223C4A),
+            decoration: InputDecoration(
+              labelText: "Type d'engin",
+              labelStyle: TextStyle(color: Colors.white),
+            ),
+            items: typesEngin
+                .map((t) => DropdownMenuItem(
+                      value: t,
+                      child: Text(t, style: TextStyle(color: Colors.white)),
+                    ))
+                .toList(),
+            onChanged: (val) => setState(() => selectedTypeEngin = val),
+          ),
           _textField("N° série", "numero_serie"),
           _textField("Carte grise", "carte_grise"),
           _textField("Assurance", "assurance"),

@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ApiService {
   static const String baseUrl = 'https://fidest.ci/decaissement/api/api.php';
@@ -138,8 +140,10 @@ class ApiService {
       'endpoint': 'historique_bons',
       'page': page.toString(),
       if (station != null && station.isNotEmpty) 'station': station,
-      if (dateDebut != null) 'date_debut': dateDebut.toIso8601String().substring(0, 10),
-      if (dateFin != null) 'date_fin': dateFin.toIso8601String().substring(0, 10),
+      if (dateDebut != null)
+        'date_debut': dateDebut.toIso8601String().substring(0, 10),
+      if (dateFin != null)
+        'date_fin': dateFin.toIso8601String().substring(0, 10),
       if (montantMin != null) 'montant_min': montantMin.toString(),
       if (montantMax != null) 'montant_max': montantMax.toString(),
     };
@@ -182,10 +186,95 @@ class ApiService {
       if (data['status'] == 'success' && data['data'] != null) {
         return List<Map<String, dynamic>>.from(data['data']);
       } else {
-        throw Exception(data['message'] ?? "Erreur lors du chargement des demandes");
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des demandes");
       }
     } else {
       throw Exception("Erreur lors du chargement des demandes");
+    }
+  }
+
+// Récupérer tous les véhicules/engins
+  Future<List<Map<String, dynamic>>> fetchVehicules() async {
+    final response = await http.get(Uri.parse('$baseUrl?endpoint=vehicules'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des véhicules");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des véhicules");
+    }
+  }
+
+// Ajouter un véhicule/engin
+  Future<bool> ajouterVehicule(Map<String, dynamic> vehicule) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl?endpoint=ajouter_vehicule'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode(vehicule),
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['status'] == 'success';
+    } else {
+      throw Exception("Erreur lors de l'ajout du véhicule");
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchChauffeurs() async {
+    final response = await http.get(Uri.parse('$baseUrl?endpoint=chauffeurs'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des chauffeurs");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des chauffeurs");
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchMarques() async {
+    final response = await http.get(Uri.parse('$baseUrl?endpoint=marques'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des marques");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des marques");
+    }
+  }
+
+  Future<bool> ajouterMarque({required String nom, XFile? logo}) async {
+    var uri = Uri.parse('$baseUrl?endpoint=ajouter_marque');
+    var request = http.MultipartRequest('POST', uri);
+    request.fields['nom'] = nom;
+    if (logo != null) {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'logo',
+          logo.path,
+          contentType: MediaType('image', logo.path.split('.').last),
+        ),
+      );
+    }
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['status'] == 'success';
+    } else {
+      throw Exception("Erreur lors de l'ajout de la marque");
     }
   }
 }
