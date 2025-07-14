@@ -8,6 +8,7 @@ import 'historique_bons_screen.dart'; // Importer l'écran HistoriqueBonsScreen
 import 'demandes_en_attente_screen.dart'; // en haut du fichier
 import 'parc_auto_screen.dart'; // Importer l'écran ParcAutoScreen
 import '../widgets/logistique_drawer.dart';
+import 'chauffeurs_screen.dart'; // Importer l'écran ChauffeursScreen
 
 class DashboardScreen extends StatefulWidget {
   @override
@@ -141,6 +142,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => ParcAutoScreen()),
+                      );
+                    },
+                  ),
+                  MenuItem(
+                    icon: Icons.person,
+                    title: "Gestion des chauffeurs",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => ChauffeursScreen()),
                       );
                     },
                   ),

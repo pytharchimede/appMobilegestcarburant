@@ -277,4 +277,58 @@ class ApiService {
       throw Exception("Erreur lors de l'ajout de la marque");
     }
   }
+
+  Future<bool> ajouterChauffeur({
+    required String nom,
+    String? telephone,
+    String? permis,
+    String? groupeSanguin,
+    XFile? photo,
+    List<Map<String, dynamic>>? pieces,
+  }) async {
+    var uri = Uri.parse('$baseUrl?endpoint=ajouter_chauffeur');
+    var request = http.MultipartRequest('POST', uri);
+    request.fields['nom'] = nom;
+    if (telephone != null && telephone.isNotEmpty)
+      request.fields['telephone'] = telephone;
+    if (permis != null && permis.isNotEmpty) request.fields['permis'] = permis;
+    if (groupeSanguin != null && groupeSanguin.isNotEmpty)
+      request.fields['groupe_sanguin'] = groupeSanguin;
+    if (photo != null) {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'photo',
+          photo.path,
+          contentType: MediaType('image', photo.path.split('.').last),
+        ),
+      );
+    }
+    if (pieces != null && pieces.isNotEmpty) {
+      for (int i = 0; i < pieces.length; i++) {
+        final piece = pieces[i];
+        if (piece['file'] != null) {
+          // Le champ doit être 'pieces' pour chaque fichier
+          request.files.add(
+            await http.MultipartFile.fromPath(
+              'pieces', // <-- pas de []
+              piece['file'].path,
+              contentType:
+                  MediaType('image', piece['file'].path.split('.').last),
+              filename: piece['file'].name,
+            ),
+          );
+          // Le champ doit être 'pieces_types' pour chaque type (array)
+          request.fields['pieces_types[$i]'] = piece['type'] ?? 'Document';
+        }
+      }
+    }
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['status'] == 'success';
+    } else {
+      throw Exception("Erreur lors de l'ajout du chauffeur");
+    }
+  }
 }
