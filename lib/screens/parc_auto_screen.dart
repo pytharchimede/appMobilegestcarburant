@@ -52,6 +52,7 @@ class _ParcAutoScreenState extends State<ParcAutoScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Erreur ajout : $e")),
       );
+      print("Erreur ajout véhicule : $e");
     }
   }
 
@@ -79,7 +80,8 @@ class _ParcAutoScreenState extends State<ParcAutoScreen> {
                       child: ListTile(
                         leading:
                             Icon(Icons.directions_car, color: Colors.white),
-                        title: Text("${auto['marque']} ${auto['modele']}",
+                        title: Text(
+                            "${auto['marque_nom'] ?? ''} ${auto['modele'] ?? ''}",
                             style: TextStyle(color: Colors.white)),
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,7 +171,7 @@ class AutoDetailDialog extends StatelessWidget {
         children: [
           Text("Plaque : ${auto['plaque']}",
               style: TextStyle(color: Colors.white70)),
-          Text("Marque : ${auto['marque']}",
+          Text("Marque : ${auto['marque_nom'] ?? ''}",
               style: TextStyle(color: Colors.white70)),
           Text("Modèle : ${auto['modele']}",
               style: TextStyle(color: Colors.white70)),
@@ -473,13 +475,17 @@ class _AddParcElementDialogState extends State<AddParcElementDialog> {
                   .toList();
               if (type == "Véhicule" || type == "Camion") {
                 data['chauffeur_nom'] = selectedChauffeur?['nom'] ?? "";
-                data['marque'] = selectedMarque?['nom'] ?? "";
-                // Ajoute les autres champs déjà gérés par _textField
+
+                if (selectedMarque?['id'] != null) {
+                  data['marque_id'] = selectedMarque!['id'].toString();
+                }
+                // PAS besoin d'envoyer 'marque'
               }
               if (type == "Engin") {
                 data['type_engin'] = selectedTypeEngin ?? "";
                 // Ajoute les autres champs déjà gérés par _textField
               }
+              print("DATA VEHICULE ENVOYÉ : $data");
               widget.onAdd(data, type == "Engin");
               Navigator.pop(context);
             }
@@ -496,7 +502,7 @@ class _AddParcElementDialogState extends State<AddParcElementDialog> {
         return [
           _textField("Plaque", "plaque"),
           DropdownButtonFormField<Map<String, dynamic>>(
-            value: selectedMarque,
+            value: marques.isNotEmpty ? selectedMarque : null,
             dropdownColor: Color(0xFF223C4A),
             decoration: InputDecoration(
               labelText: "Marque",

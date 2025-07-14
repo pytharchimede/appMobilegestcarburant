@@ -219,9 +219,10 @@ class ApiService {
     );
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      return data['status'] == 'success';
+      if (data['status'] == 'success') return true;
+      throw Exception(data['message'] ?? "Erreur lors de l'ajout du véhicule");
     } else {
-      throw Exception("Erreur lors de l'ajout du véhicule");
+      throw Exception("Erreur lors de l'ajout du véhicule: ${response.body}");
     }
   }
 
