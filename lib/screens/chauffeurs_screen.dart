@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/api_services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ChauffeursScreen extends StatefulWidget {
   @override
@@ -225,11 +226,170 @@ class _ChauffeursScreenState extends State<ChauffeursScreen> {
                               style: TextStyle(color: Colors.white70)),
                           trailing: Icon(Icons.arrow_forward_ios,
                               color: Colors.white54, size: 16),
-                          // Tu peux ajouter ici un détail ou une édition si besoin
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (_) =>
+                                  ChauffeurDetailDialog(chauffeur: ch),
+                            );
+                          },
                         ),
                       ))
                   .toList(),
             ),
+    );
+  }
+}
+
+class ChauffeurDetailDialog extends StatefulWidget {
+  final Map<String, dynamic> chauffeur;
+  const ChauffeurDetailDialog({required this.chauffeur});
+
+  @override
+  State<ChauffeurDetailDialog> createState() => _ChauffeurDetailDialogState();
+}
+
+class _ChauffeurDetailDialogState extends State<ChauffeurDetailDialog> {
+  List<Map<String, dynamic>> pieces = [];
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPieces();
+  }
+
+  Future<void> _loadPieces() async {
+    setState(() => loading = true);
+    try {
+      final api = ApiService();
+      final res =
+          await api.fetchChauffeurPieces(widget.chauffeur['id'].toString());
+      setState(() => pieces = res);
+    } catch (e) {}
+    setState(() => loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ch = widget.chauffeur;
+    return Dialog(
+      backgroundColor: Color(0xFF223C4A),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircleAvatar(
+                radius: 48,
+                backgroundColor: Colors.white10,
+                backgroundImage: ch['photo_url'] != null &&
+                        ch['photo_url'].toString().isNotEmpty
+                    ? NetworkImage(
+                        'https://fidest.ci/decaissement/api/${ch['photo_url']}')
+                    : null,
+                child: (ch['photo_url'] == null ||
+                        ch['photo_url'].toString().isEmpty)
+                    ? Icon(Icons.person, color: Colors.white, size: 48)
+                    : null,
+              ),
+              SizedBox(height: 16),
+              Text(ch['nom'] ?? '',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 22)),
+              SizedBox(height: 8),
+              if (ch['telephone'] != null &&
+                  ch['telephone'].toString().isNotEmpty)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.phone, color: Colors.greenAccent, size: 18),
+                    SizedBox(width: 6),
+                    Text(ch['telephone'],
+                        style: TextStyle(color: Colors.white70)),
+                  ],
+                ),
+              if (ch['permis'] != null && ch['permis'].toString().isNotEmpty)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.credit_card, color: Colors.blueAccent, size: 18),
+                    SizedBox(width: 6),
+                    Text("Permis : ${ch['permis']}",
+                        style: TextStyle(color: Colors.white70)),
+                  ],
+                ),
+              if (ch['groupe_sanguin'] != null &&
+                  ch['groupe_sanguin'].toString().isNotEmpty)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.bloodtype, color: Colors.redAccent, size: 18),
+                    SizedBox(width: 6),
+                    Text("Groupe : ${ch['groupe_sanguin']}",
+                        style: TextStyle(color: Colors.white70)),
+                  ],
+                ),
+              SizedBox(height: 18),
+              Divider(color: Colors.white24),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text("Pièces jointes :",
+                    style: TextStyle(
+                        color: Colors.greenAccent,
+                        fontWeight: FontWeight.bold)),
+              ),
+              loading
+                  ? Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : pieces.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text("Aucune pièce",
+                              style: TextStyle(color: Colors.white54)),
+                        )
+                      : Column(
+                          children: pieces.map((piece) {
+                            final url = piece['url'] ?? '';
+                            final isPdf =
+                                url.toString().toLowerCase().endsWith('.pdf');
+                            return ListTile(
+                              leading: isPdf
+                                  ? Icon(Icons.picture_as_pdf,
+                                      color: Colors.redAccent)
+                                  : Icon(Icons.image, color: Colors.blueAccent),
+                              title: Text(piece['type'] ?? 'Document',
+                                  style: TextStyle(color: Colors.white)),
+                              trailing: IconButton(
+                                icon: Icon(Icons.open_in_new, color: Colors.white70),
+                                onPressed: () async {
+                                  final fullUrl = 'https://fidest.ci/decaissement/api/$url';
+                                  if (await canLaunchUrl(Uri.parse(fullUrl))) {
+                                    await launchUrl(Uri.parse(fullUrl), mode: LaunchMode.externalApplication);
+                                  }
+                                },
+                              ),
+                            );
+                          }).toList(),
+                        ),
+              SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  child: Text("Fermer", style: TextStyle(color: Colors.white)),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

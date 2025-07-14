@@ -331,4 +331,21 @@ class ApiService {
       throw Exception("Erreur lors de l'ajout du chauffeur");
     }
   }
+
+  Future<List<Map<String, dynamic>>> fetchChauffeurPieces(
+      String chauffeurId) async {
+    final response = await http.get(Uri.parse(
+        '$baseUrl?endpoint=chauffeur_pieces&chauffeur_id=$chauffeurId'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des pièces");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des pièces");
+    }
+  }
 }
