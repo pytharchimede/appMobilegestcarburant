@@ -266,13 +266,17 @@ class _BonEntreeScreenState extends State<BonEntreeScreen> {
     );
   }
 
-  String? _libelleChantier(int? id) {
+  String? _libelleChantier(dynamic id) {
     if (id == null) return null;
-    final chantier = chantiers.firstWhere(
-      (c) => c['id'] == id,
-      orElse: () => {},
-    );
-    return chantier['libelle'];
+    try {
+      final chantier = chantiers.firstWhere(
+        (c) => c['id'].toString() == id.toString(),
+        orElse: () => {},
+      );
+      return chantier['libelle'] ?? "Inconnu";
+    } catch (e) {
+      return "Inconnu";
+    }
   }
 
   @override

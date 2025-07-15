@@ -856,7 +856,7 @@ class ApiService {
     var uri = Uri.parse('$baseUrl?endpoint=ajouter_bon_entree');
     var request = http.MultipartRequest('POST', uri);
     request.fields['numero'] = numero;
-    request.fields['date'] = date.toIso8601String().substring(0, 10);
+    request.fields['date_entree'] = date.toIso8601String().substring(0, 10);
     request.fields['fournisseur'] = fournisseur;
     request.fields['categorie'] = categorie;
     request.fields['quantite'] = quantite.toString();
@@ -869,6 +869,10 @@ class ApiService {
     }
     var streamedResponse = await request.send();
     var response = await http.Response.fromStream(streamedResponse);
+
+    print('Réponse HTTP: ${response.statusCode}');
+    print('Réponse body: ${response.body}');
+
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       return data['status'] == 'success';
