@@ -880,4 +880,79 @@ class ApiService {
       throw Exception("Erreur lors de l'ajout du bon d'entrée");
     }
   }
+
+  // Liste des bons de sortie
+  Future<List<Map<String, dynamic>>> fetchBonsSortie() async {
+    final response = await http.get(Uri.parse('$baseUrl?endpoint=bons_sortie'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des bons de sortie");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des bons de sortie");
+    }
+  }
+
+  // Liste des motifs de sortie
+  Future<List<String>> fetchBonSortieMotifs() async {
+    final response =
+        await http.get(Uri.parse('$baseUrl?endpoint=bon_sortie_motifs'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<String>.from(data['data'].map((e) => e['libelle']));
+      } else {
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des motifs");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des motifs");
+    }
+  }
+
+  // Ajouter un bon de sortie (avec pièce jointe)
+  Future<bool> ajouterBonSortie({
+    required String numero,
+    required DateTime date,
+    required String beneficiaire,
+    required String categorie,
+    required int quantite,
+    required String motif,
+    XFile? piece,
+    required String commentaire,
+    required String affectation,
+    int? chantierId,
+  }) async {
+    var uri = Uri.parse('$baseUrl?endpoint=ajouter_bon_sortie');
+    var request = http.MultipartRequest('POST', uri);
+    request.fields['numero'] = numero;
+    request.fields['date_sortie'] = date.toIso8601String().substring(0, 10);
+    request.fields['beneficiaire'] = beneficiaire;
+    request.fields['categorie'] = categorie;
+    request.fields['quantite'] = quantite.toString();
+    request.fields['motif'] = motif;
+    request.fields['commentaire'] = commentaire;
+    request.fields['affectation'] = affectation;
+    if (chantierId != null)
+      request.fields['chantier_id'] = chantierId.toString();
+    if (piece != null) {
+      request.files.add(await http.MultipartFile.fromPath('piece', piece.path));
+    }
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
+
+    print('Réponse HTTP: ${response.statusCode}');
+    print('Réponse body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['status'] == 'success';
+    } else {
+      throw Exception("Erreur lors de l'ajout du bon de sortie");
+    }
+  }
 }

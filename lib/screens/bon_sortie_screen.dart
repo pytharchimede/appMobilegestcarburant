@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../services/api_services.dart';
 
 class BonSortieScreen extends StatefulWidget {
   const BonSortieScreen({Key? key}) : super(key: key);
@@ -10,72 +11,67 @@ class BonSortieScreen extends StatefulWidget {
 }
 
 class _BonSortieScreenState extends State<BonSortieScreen> {
-  // Liste de chantiers simulés
-  final List<Map<String, dynamic>> chantiers = [
-    {"id": 1, "libelle": "Chantier Siège"},
-    {"id": 2, "libelle": "Chantier Annexe"},
-    {"id": 3, "libelle": "Chantier Extension"},
-  ];
-
-  // Données de test pour les bons de sortie
-  List<Map<String, dynamic>> bons = [
-    {
-      "numero": "BS-2025-001",
-      "date": DateTime(2025, 7, 15),
-      "beneficiaire": "Equipe chantier A",
-      "categorie": "Ciment",
-      "quantite": 20,
-      "motif": "Consommation chantier",
-      "piece": null,
-      "commentaire": "Sortie validée",
-      "affectation": "Sur chantier",
-      "chantierId": 1,
-    },
-    {
-      "numero": "BS-2025-002",
-      "date": DateTime(2025, 7, 16),
-      "beneficiaire": "Bureau",
-      "categorie": "Papier",
-      "quantite": 5,
-      "motif": "Usage bureau",
-      "piece": null,
-      "commentaire": "",
-      "affectation": "Pour le bureau",
-      "chantierId": null,
-    },
-  ];
-
-  final List<String> categories = [
-    "Carburant",
-    "Ciment",
-    "Fer à béton",
-    "Outils",
-    "Papier",
-    "Divers",
-  ];
-
-  final List<String> affectations = [
+  final ApiService apiService = ApiService();
+  List<Map<String, dynamic>> chantiers = [];
+  List<String> categories = [];
+  List<Map<String, dynamic>> bons = [];
+  List<String> affectations = [
     "En stock",
     "Sur chantier",
     "Pour le bureau",
     "Autre",
   ];
+  List<String> motifs = [];
+  bool isLoading = false;
 
-  final List<String> motifs = [
-    "Consommation chantier",
-    "Usage bureau",
-    "Transfert",
-    "Retour fournisseur",
-    "Autre",
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => isLoading = true);
+    try {
+      // À adapter selon tes endpoints pour chantiers et catégories
+      chantiers = await apiService.fetchChantiers();
+      categories = await apiService.fetchBonEntreeCategories();
+      motifs = await apiService.fetchBonSortieMotifs();
+      bons = await apiService.fetchBonsSortie();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Erreur chargement : $e")),
+      );
+    }
+    setState(() => isLoading = false);
+  }
 
   void _ajouterBon() async {
+    if (categories.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Aucune catégorie disponible")),
+      );
+      return;
+    }
+    if (chantiers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Aucun chantier disponible")),
+      );
+      return;
+    }
+    if (motifs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Aucun motif disponible")),
+      );
+      return;
+    }
+
     final numeroController = TextEditingController();
     DateTime date = DateTime.now();
     final beneficiaireController = TextEditingController();
     String? selectedCategorie = categories.first;
     String? selectedAffectation = affectations.first;
-    int? selectedChantierId = chantiers.first['id'];
+    int? selectedChantierId = int.tryParse(chantiers.first['id'].toString());
     String? selectedMotif = motifs.first;
     final quantiteController = TextEditingController();
     final commentaireController = TextEditingController();
@@ -200,7 +196,7 @@ class _BonSortieScreenState extends State<BonSortieScreen> {
                       style: TextStyle(color: Colors.white),
                       items: chantiers
                           .map((chantier) => DropdownMenuItem<int>(
-                                value: chantier['id'],
+                                value: int.tryParse(chantier['id'].toString()),
                                 child: Text(chantier['libelle'],
                                     style: TextStyle(color: Colors.white)),
                               ))
@@ -248,24 +244,35 @@ class _BonSortieScreenState extends State<BonSortieScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
               child: Text("Ajouter"),
-              onPressed: () {
-                setState(() {
-                  bons.add({
-                    "numero": numeroController.text,
-                    "date": date,
-                    "beneficiaire": beneficiaireController.text,
-                    "categorie": selectedCategorie ?? "",
-                    "quantite": int.tryParse(quantiteController.text) ?? 0,
-                    "motif": selectedMotif ?? "",
-                    "piece": pieceJointe,
-                    "commentaire": commentaireController.text,
-                    "affectation": selectedAffectation,
-                    "chantierId": selectedAffectation == "Sur chantier"
+              onPressed: () async {
+                try {
+                  final ok = await apiService.ajouterBonSortie(
+                    numero: numeroController.text,
+                    date: date,
+                    beneficiaire: beneficiaireController.text,
+                    categorie: selectedCategorie ?? "",
+                    quantite: int.tryParse(quantiteController.text) ?? 0,
+                    motif: selectedMotif ?? "",
+                    piece: pieceJointe,
+                    commentaire: commentaireController.text,
+                    affectation: selectedAffectation ?? "",
+                    chantierId: selectedAffectation == "Sur chantier"
                         ? selectedChantierId
                         : null,
-                  });
-                });
-                Navigator.pop(context);
+                  );
+                  if (ok) {
+                    Navigator.pop(context);
+                    await _loadData();
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Erreur lors de l'ajout")),
+                    );
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Erreur API : $e")),
+                  );
+                }
               },
             ),
           ],
@@ -290,10 +297,10 @@ class _BonSortieScreenState extends State<BonSortieScreen> {
     );
   }
 
-  String? _libelleChantier(int? id) {
+  String? _libelleChantier(dynamic id) {
     if (id == null) return null;
     final chantier = chantiers.firstWhere(
-      (c) => c['id'] == id,
+      (c) => c['id'].toString() == id.toString(),
       orElse: () => {},
     );
     return chantier['libelle'];
@@ -307,84 +314,99 @@ class _BonSortieScreenState extends State<BonSortieScreen> {
         backgroundColor: Color(0xFF17333F),
         title: Text("Bons de sortie"),
       ),
-      body: bons.isEmpty
-          ? Center(
-              child: Text("Aucun bon de sortie",
-                  style: TextStyle(color: Colors.white54)))
-          : ListView.separated(
-              padding: EdgeInsets.all(16),
-              itemCount: bons.length,
-              separatorBuilder: (_, __) => Divider(color: Colors.white24),
-              itemBuilder: (context, index) {
-                final b = bons[index];
-                return Card(
-                  color: Color(0xFF223C4A),
-                  child: ListTile(
-                    leading: Icon(Icons.output, color: Colors.greenAccent),
-                    title: Text(b['numero'],
-                        style: TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold)),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                            "Date : ${b['date'].day}/${b['date'].month}/${b['date'].year}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text("Bénéficiaire : ${b['beneficiaire']}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text("Catégorie : ${b['categorie']}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text("Quantité : ${b['quantite']}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text("Motif : ${b['motif']}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text(
-                          "Affectation : ${b['affectation']}" +
-                              (b['affectation'] == "Sur chantier" &&
-                                      b['chantierId'] != null
-                                  ? " (${_libelleChantier(b['chantierId'])})"
-                                  : ""),
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                        if ((b['commentaire'] ?? '').isNotEmpty)
-                          Text("Commentaire : ${b['commentaire']}",
-                              style: TextStyle(color: Colors.white54)),
-                        if (b['piece'] != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4.0),
-                            child: Row(
-                              children: [
-                                Icon(Icons.image,
-                                    color: Colors.greenAccent, size: 18),
-                                SizedBox(width: 4),
-                                Text("Scan disponible",
-                                    style: TextStyle(
-                                        color: Colors.greenAccent,
-                                        fontSize: 13)),
-                              ],
+      body: isLoading
+          ? Center(child: CircularProgressIndicator())
+          : bons.isEmpty
+              ? Center(
+                  child: Text("Aucun bon de sortie",
+                      style: TextStyle(color: Colors.white54)))
+              : ListView.separated(
+                  padding: EdgeInsets.all(16),
+                  itemCount: bons.length,
+                  separatorBuilder: (_, __) => Divider(color: Colors.white24),
+                  itemBuilder: (context, index) {
+                    final b = bons[index];
+                    final date = DateTime.tryParse(b['date_sortie'] ?? "") ??
+                        DateTime.now();
+                    return Card(
+                      color: Color(0xFF223C4A),
+                      child: ListTile(
+                        leading: Icon(Icons.output, color: Colors.greenAccent),
+                        title: Text(b['numero'] ?? "",
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold)),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                                "Date : ${date.day}/${date.month}/${date.year}",
+                                style: TextStyle(color: Colors.white70)),
+                            Text("Bénéficiaire : ${b['beneficiaire'] ?? ""}",
+                                style: TextStyle(color: Colors.white70)),
+                            Text("Catégorie : ${b['categorie'] ?? ""}",
+                                style: TextStyle(color: Colors.white70)),
+                            Text("Quantité : ${b['quantite'] ?? ""}",
+                                style: TextStyle(color: Colors.white70)),
+                            Text("Motif : ${b['motif'] ?? ""}",
+                                style: TextStyle(color: Colors.white70)),
+                            Text(
+                              "Affectation : ${b['affectation'] ?? ""}" +
+                                  ((b['affectation'] == "Sur chantier" &&
+                                          b['chantier_id'] != null)
+                                      ? " (${_libelleChantier(b['chantier_id'])})"
+                                      : ""),
+                              style: TextStyle(color: Colors.white70),
                             ),
-                          ),
-                      ],
-                    ),
-                    onTap: b['piece'] != null
-                        ? () {
-                            showDialog(
-                              context: context,
-                              builder: (_) => Dialog(
-                                backgroundColor: Colors.black,
-                                child: Image.file(File(b['piece'].path)),
+                            if ((b['commentaire'] ?? '').toString().isNotEmpty)
+                              Text("Commentaire : ${b['commentaire']}",
+                                  style: TextStyle(color: Colors.white54)),
+                            if (b['piece'] != null &&
+                                b['piece'].toString().isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4.0),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.image,
+                                        color: Colors.greenAccent, size: 18),
+                                    SizedBox(width: 4),
+                                    Text("Scan disponible",
+                                        style: TextStyle(
+                                            color: Colors.greenAccent,
+                                            fontSize: 13)),
+                                  ],
+                                ),
                               ),
-                            );
-                          }
-                        : null,
-                  ),
-                );
-              },
-            ),
+                          ],
+                        ),
+                        onTap: (b['piece'] != null &&
+                                b['piece'].toString().isNotEmpty)
+                            ? () {
+                                showDialog(
+                                  context: context,
+                                  builder: (_) => Dialog(
+                                    backgroundColor: Colors.black,
+                                    child: Image.network(
+                                      'https://fidest.ci/decaissement/uploads/${b['piece']}',
+                                      errorBuilder: (_, __, ___) => Center(
+                                          child: Text("Image non disponible",
+                                              style: TextStyle(
+                                                  color: Colors.white))),
+                                    ),
+                                  ),
+                                );
+                              }
+                            : null,
+                      ),
+                    );
+                  },
+                ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.green,
         child: Icon(Icons.add),
-        onPressed: _ajouterBon,
+        onPressed: (categories.isEmpty || chantiers.isEmpty || motifs.isEmpty)
+            ? null
+            : _ajouterBon,
         tooltip: "Ajouter un bon de sortie",
       ),
     );
