@@ -474,4 +474,63 @@ class ApiService {
       throw Exception("Erreur lors de la mise à jour du rapport");
     }
   }
+
+  // Récupérer la liste des matériels
+  Future<List<Map<String, dynamic>>> fetchMateriels() async {
+    final response = await http.get(Uri.parse('$baseUrl?endpoint=materiels'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des matériels");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des matériels");
+    }
+  }
+
+// Récupérer la liste des catégories
+  Future<List<Map<String, dynamic>>> fetchMaterielCategories() async {
+    final response =
+        await http.get(Uri.parse('$baseUrl?endpoint=materiel_categories'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des catégories");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des catégories");
+    }
+  }
+
+// Ajouter un matériel
+  Future<bool> ajouterMateriel({
+    required String nom,
+    required String categorie, // Peut être id ou libellé
+    required String etat,
+    required int quantite,
+    required String emplacement,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl?endpoint=ajouter_materiel'),
+      body: {
+        'nom': nom,
+        'categorie': categorie,
+        'etat': etat,
+        'quantite': quantite.toString(),
+        'emplacement': emplacement,
+      },
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['status'] == 'success';
+    } else {
+      throw Exception("Erreur lors de l'ajout du matériel");
+    }
+  }
 }

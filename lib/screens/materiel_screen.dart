@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_services.dart';
 
 class MaterielScreen extends StatefulWidget {
   const MaterielScreen({Key? key}) : super(key: key);
@@ -8,35 +9,37 @@ class MaterielScreen extends StatefulWidget {
 }
 
 class _MaterielScreenState extends State<MaterielScreen> {
-  // Liste JSON simulée pour les catégories
-  final List<Map<String, dynamic>> categories = [
-    {"id": 1, "libelle": "Outil électrique"},
-    {"id": 2, "libelle": "Équipement"},
-    {"id": 3, "libelle": "Véhicule"},
-    {"id": 4, "libelle": "Mobilier"},
-    {"id": 5, "libelle": "Informatique"},
-  ];
+  final ApiService apiService = ApiService();
+  List<Map<String, dynamic>> materiels = [];
+  List<Map<String, dynamic>> categories = [];
+  bool isLoading = true;
+  String? error;
 
-  List<Map<String, dynamic>> materiels = [
-    {
-      "nom": "Perceuse Bosch",
-      "categorie": "Outil électrique",
-      "etat": "Disponible",
-      "quantite": 3,
-      "emplacement": "Atelier principal",
-    },
-    {
-      "nom": "Échelle aluminium",
-      "categorie": "Équipement",
-      "etat": "En maintenance",
-      "quantite": 1,
-      "emplacement": "Dépôt 2",
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      isLoading = true;
+      error = null;
+    });
+    try {
+      categories = await apiService.fetchMaterielCategories();
+      materiels = await apiService.fetchMateriels();
+    } catch (e) {
+      error = e.toString();
+    }
+    setState(() {
+      isLoading = false;
+    });
+  }
 
   void _ajouterMateriel() async {
     final nomController = TextEditingController();
-    String? selectedCategorie = categories.first['libelle'];
+    String? selectedCategorie = categories.isNotEmpty ? categories.first['libelle'] : null;
     final etatController = TextEditingController();
     final quantiteController = TextEditingController();
     final emplacementController = TextEditingController();
@@ -46,8 +49,7 @@ class _MaterielScreenState extends State<MaterielScreen> {
       builder: (_) => AlertDialog(
         backgroundColor: Color(0xFF223C4A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title:
-            Text("Ajouter un matériel", style: TextStyle(color: Colors.white)),
+        title: Text("Ajouter un matériel", style: TextStyle(color: Colors.white)),
         content: SingleChildScrollView(
           child: Column(
             children: [
@@ -64,12 +66,13 @@ class _MaterielScreenState extends State<MaterielScreen> {
                   style: TextStyle(color: Colors.white),
                   items: categories
                       .map((cat) => DropdownMenuItem<String>(
-                            value: cat['libelle'] as String, // <-- cast ici
-                            child: Text(cat['libelle'] as String,
-                                style: TextStyle(color: Colors.white)),
+                            value: cat['libelle'] as String,
+                            child: Text(cat['libelle'] as String, style: TextStyle(color: Colors.white)),
                           ))
                       .toList(),
-                  onChanged: (val) => setState(() => selectedCategorie = val),
+                  onChanged: (val) {
+                    selectedCategorie = val;
+                  },
                 ),
               ),
               _textField("État", etatController),
@@ -86,17 +89,28 @@ class _MaterielScreenState extends State<MaterielScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             child: Text("Ajouter"),
-            onPressed: () {
-              setState(() {
-                materiels.add({
-                  "nom": nomController.text,
-                  "categorie": selectedCategorie ?? "",
-                  "etat": etatController.text,
-                  "quantite": int.tryParse(quantiteController.text) ?? 1,
-                  "emplacement": emplacementController.text,
-                });
-              });
-              Navigator.pop(context);
+            onPressed: () async {
+              try {
+                final ok = await apiService.ajouterMateriel(
+                  nom: nomController.text,
+                  categorie: selectedCategorie ?? "",
+                  etat: etatController.text,
+                  quantite: int.tryParse(quantiteController.text) ?? 1,
+                  emplacement: emplacementController.text,
+                );
+                if (ok) {
+                  Navigator.pop(context);
+                  await _loadData();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Erreur lors de l'ajout")),
+                  );
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Erreur API : $e")),
+                );
+              }
             },
           ),
         ],
@@ -104,8 +118,7 @@ class _MaterielScreenState extends State<MaterielScreen> {
     );
   }
 
-  Widget _textField(String label, TextEditingController controller,
-      {bool isNumber = false}) {
+  Widget _textField(String label, TextEditingController controller, {bool isNumber = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: TextField(
@@ -128,40 +141,36 @@ class _MaterielScreenState extends State<MaterielScreen> {
         backgroundColor: Color(0xFF17333F),
         title: Text("Matériel"),
       ),
-      body: materiels.isEmpty
-          ? Center(
-              child: Text("Aucun matériel",
-                  style: TextStyle(color: Colors.white54)))
-          : ListView.separated(
-              padding: EdgeInsets.all(16),
-              itemCount: materiels.length,
-              separatorBuilder: (_, __) => Divider(color: Colors.white24),
-              itemBuilder: (context, index) {
-                final m = materiels[index];
-                return Card(
-                  color: Color(0xFF223C4A),
-                  child: ListTile(
-                    leading: Icon(Icons.handyman, color: Colors.greenAccent),
-                    title: Text(m['nom'],
-                        style: TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold)),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Catégorie : ${m['categorie']}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text("État : ${m['etat']}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text("Quantité : ${m['quantite']}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text("Emplacement : ${m['emplacement']}",
-                            style: TextStyle(color: Colors.white70)),
-                      ],
+      body: isLoading
+          ? Center(child: CircularProgressIndicator(color: Colors.white))
+          : error != null
+              ? Center(child: Text(error!, style: TextStyle(color: Colors.redAccent)))
+              : materiels.isEmpty
+                  ? Center(child: Text("Aucun matériel", style: TextStyle(color: Colors.white54)))
+                  : ListView.separated(
+                      padding: EdgeInsets.all(16),
+                      itemCount: materiels.length,
+                      separatorBuilder: (_, __) => Divider(color: Colors.white24),
+                      itemBuilder: (context, index) {
+                        final m = materiels[index];
+                        return Card(
+                          color: Color(0xFF223C4A),
+                          child: ListTile(
+                            leading: Icon(Icons.handyman, color: Colors.greenAccent),
+                            title: Text(m['nom'], style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("Catégorie : ${m['categorie']}", style: TextStyle(color: Colors.white70)),
+                                Text("État : ${m['etat']}", style: TextStyle(color: Colors.white70)),
+                                Text("Quantité : ${m['quantite']}", style: TextStyle(color: Colors.white70)),
+                                Text("Emplacement : ${m['emplacement']}", style: TextStyle(color: Colors.white70)),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  ),
-                );
-              },
-            ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.green,
         child: Icon(Icons.add),
