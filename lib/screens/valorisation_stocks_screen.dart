@@ -191,8 +191,11 @@ class _ValorisationStocksScreenState extends State<ValorisationStocksScreen> {
                             Divider(color: Colors.white24),
                         itemBuilder: (context, index) {
                           final s = stocks[index];
-                          final montant = (s['quantite'] as int) *
-                              (s['prix_unitaire'] as int);
+                          final quantite =
+                              int.tryParse(s['quantite'].toString()) ?? 0;
+                          final prixUnitaire =
+                              int.tryParse(s['prix_unitaire'].toString()) ?? 0;
+                          final montant = quantite * prixUnitaire;
                           return Card(
                             color: Color(0xFF223C4A),
                             child: ListTile(
@@ -209,10 +212,9 @@ class _ValorisationStocksScreenState extends State<ValorisationStocksScreen> {
                                 children: [
                                   Text("Catégorie : ${s['categorie']}",
                                       style: TextStyle(color: Colors.white70)),
-                                  Text("Quantité : ${s['quantite']}",
+                                  Text("Quantité : $quantite",
                                       style: TextStyle(color: Colors.white70)),
-                                  Text(
-                                      "Prix unitaire : ${s['prix_unitaire']} FCFA",
+                                  Text("Prix unitaire : $prixUnitaire FCFA",
                                       style: TextStyle(color: Colors.white70)),
                                   Text("Montant : $montant FCFA",
                                       style: TextStyle(
