@@ -146,10 +146,32 @@ class _DemandesEnAttenteScreenState extends State<DemandesEnAttenteScreen> {
                                       );
                                     }
                                   },
-                                  onRefuse: () {
-                                    // Appelle ton API pour refuser
-                                    Navigator.pop(context);
-                                    _loadDemandes();
+                                  onRefuse: () async {
+                                    try {
+                                      final ok = await apiService
+                                          .refuserDemandeCarburant(
+                                              demande['num_fiche']
+                                                  .toString());
+                                      if (ok) {
+                                        Navigator.pop(context);
+                                        _loadDemandes();
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                              content: Text(
+                                                  "Demande refusée avec succès")),
+                                        );
+                                      } else {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                              content: Text("Erreur lors du refus")),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                            content: Text("Erreur API : $e")),
+                                      );
+                                    }
                                   },
                                 ),
                               ),

@@ -200,6 +200,7 @@ class ApiService {
     }
   }
 
+//Accepter demande de carburant
   Future<bool> accepterDemandeCarburant(String numFiche) async {
     final response = await http.post(
       Uri.parse('$baseUrl?endpoint=accepter_demande_carburant'),
@@ -210,6 +211,20 @@ class ApiService {
       return data['status'] == 'success';
     } else {
       throw Exception("Erreur lors de l'acceptation");
+    }
+  }
+
+//Réfuser demande de carburant
+  Future<bool> refuserDemandeCarburant(String numFiche) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl?endpoint=refuser_demande_carburant'),
+      body: {'num_fiche': numFiche},
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['status'] == 'success';
+    } else {
+      throw Exception("Erreur lors du refus");
     }
   }
 
