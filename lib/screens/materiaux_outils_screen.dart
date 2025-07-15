@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_services.dart';
 
 class MateriauxOutilsScreen extends StatefulWidget {
   const MateriauxOutilsScreen({Key? key}) : super(key: key);
@@ -8,34 +9,38 @@ class MateriauxOutilsScreen extends StatefulWidget {
 }
 
 class _MateriauxOutilsScreenState extends State<MateriauxOutilsScreen> {
-  // Liste JSON simulée pour les catégories
-  final List<Map<String, dynamic>> categories = [
-    {"id": 1, "libelle": "Matériau de construction"},
-    {"id": 2, "libelle": "Outil à main"},
-    {"id": 3, "libelle": "Outil électrique"},
-    {"id": 4, "libelle": "Consommable"},
-  ];
+  final ApiService apiService = ApiService();
+  List<Map<String, dynamic>> categories = [];
+  List<Map<String, dynamic>> materiaux = [];
+  bool isLoading = true;
+  String? error;
 
-  List<Map<String, dynamic>> materiaux = [
-    {
-      "nom": "Ciment 50kg",
-      "categorie": "Matériau de construction",
-      "etat": "Stocké",
-      "quantite": 20,
-      "emplacement": "Magasin principal",
-    },
-    {
-      "nom": "Marteau Stanley",
-      "categorie": "Outil à main",
-      "etat": "Disponible",
-      "quantite": 5,
-      "emplacement": "Atelier",
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      isLoading = true;
+      error = null;
+    });
+    try {
+      categories = await apiService.fetchMateriauxOutilsCategories();
+      materiaux = await apiService.fetchMateriauxOutils();
+    } catch (e) {
+      error = e.toString();
+    }
+    setState(() {
+      isLoading = false;
+    });
+  }
 
   void _ajouterMateriau() async {
     final nomController = TextEditingController();
-    String? selectedCategorie = categories.first['libelle'];
+    String? selectedCategorie =
+        categories.isNotEmpty ? categories.first['libelle'] : null;
     final etatController = TextEditingController();
     final quantiteController = TextEditingController();
     final emplacementController = TextEditingController();
@@ -68,7 +73,9 @@ class _MateriauxOutilsScreenState extends State<MateriauxOutilsScreen> {
                                 style: TextStyle(color: Colors.white)),
                           ))
                       .toList(),
-                  onChanged: (val) => setState(() => selectedCategorie = val),
+                  onChanged: (val) {
+                    selectedCategorie = val;
+                  },
                 ),
               ),
               _textField("État", etatController),
@@ -85,17 +92,28 @@ class _MateriauxOutilsScreenState extends State<MateriauxOutilsScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             child: Text("Ajouter"),
-            onPressed: () {
-              setState(() {
-                materiaux.add({
-                  "nom": nomController.text,
-                  "categorie": selectedCategorie ?? "",
-                  "etat": etatController.text,
-                  "quantite": int.tryParse(quantiteController.text) ?? 1,
-                  "emplacement": emplacementController.text,
-                });
-              });
-              Navigator.pop(context);
+            onPressed: () async {
+              try {
+                final ok = await apiService.ajouterMateriauOutil(
+                  nom: nomController.text,
+                  categorie: selectedCategorie ?? "",
+                  etat: etatController.text,
+                  quantite: int.tryParse(quantiteController.text) ?? 1,
+                  emplacement: emplacementController.text,
+                );
+                if (ok) {
+                  Navigator.pop(context);
+                  await _loadData();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Erreur lors de l'ajout")),
+                  );
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Erreur API : $e")),
+                );
+              }
             },
           ),
         ],
@@ -127,41 +145,49 @@ class _MateriauxOutilsScreenState extends State<MateriauxOutilsScreen> {
         backgroundColor: Color(0xFF17333F),
         title: Text("Matériaux & Outils"),
       ),
-      body: materiaux.isEmpty
-          ? Center(
-              child: Text("Aucun matériau ou outil",
-                  style: TextStyle(color: Colors.white54)))
-          : ListView.separated(
-              padding: EdgeInsets.all(16),
-              itemCount: materiaux.length,
-              separatorBuilder: (_, __) => Divider(color: Colors.white24),
-              itemBuilder: (context, index) {
-                final m = materiaux[index];
-                return Card(
-                  color: Color(0xFF223C4A),
-                  child: ListTile(
-                    leading:
-                        Icon(Icons.construction, color: Colors.greenAccent),
-                    title: Text(m['nom'],
-                        style: TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold)),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Catégorie : ${m['categorie']}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text("État : ${m['etat']}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text("Quantité : ${m['quantite']}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text("Emplacement : ${m['emplacement']}",
-                            style: TextStyle(color: Colors.white70)),
-                      ],
+      body: isLoading
+          ? Center(child: CircularProgressIndicator(color: Colors.white))
+          : error != null
+              ? Center(
+                  child:
+                      Text(error!, style: TextStyle(color: Colors.redAccent)))
+              : materiaux.isEmpty
+                  ? Center(
+                      child: Text("Aucun matériau ou outil",
+                          style: TextStyle(color: Colors.white54)))
+                  : ListView.separated(
+                      padding: EdgeInsets.all(16),
+                      itemCount: materiaux.length,
+                      separatorBuilder: (_, __) =>
+                          Divider(color: Colors.white24),
+                      itemBuilder: (context, index) {
+                        final m = materiaux[index];
+                        return Card(
+                          color: Color(0xFF223C4A),
+                          child: ListTile(
+                            leading: Icon(Icons.construction,
+                                color: Colors.greenAccent),
+                            title: Text(m['nom'],
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold)),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("Catégorie : ${m['categorie']}",
+                                    style: TextStyle(color: Colors.white70)),
+                                Text("État : ${m['etat']}",
+                                    style: TextStyle(color: Colors.white70)),
+                                Text("Quantité : ${m['quantite']}",
+                                    style: TextStyle(color: Colors.white70)),
+                                Text("Emplacement : ${m['emplacement']}",
+                                    style: TextStyle(color: Colors.white70)),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  ),
-                );
-              },
-            ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.green,
         child: Icon(Icons.add),

@@ -533,4 +533,64 @@ class ApiService {
       throw Exception("Erreur lors de l'ajout du matériel");
     }
   }
+
+  // Récupérer la liste des matériaux & outils
+  Future<List<Map<String, dynamic>>> fetchMateriauxOutils() async {
+    final response =
+        await http.get(Uri.parse('$baseUrl?endpoint=materiaux_outils'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(data['message'] ??
+            "Erreur lors du chargement des matériaux/outils");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des matériaux/outils");
+    }
+  }
+
+// Récupérer la liste des catégories
+  Future<List<Map<String, dynamic>>> fetchMateriauxOutilsCategories() async {
+    final response = await http
+        .get(Uri.parse('$baseUrl?endpoint=materiaux_outils_categories'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des catégories");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des catégories");
+    }
+  }
+
+// Ajouter un matériau ou outil
+  Future<bool> ajouterMateriauOutil({
+    required String nom,
+    required String categorie, // Peut être id ou libellé
+    required String etat,
+    required int quantite,
+    required String emplacement,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl?endpoint=ajouter_materiau_outil'),
+      body: {
+        'nom': nom,
+        'categorie': categorie,
+        'etat': etat,
+        'quantite': quantite.toString(),
+        'emplacement': emplacement,
+      },
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['status'] == 'success';
+    } else {
+      throw Exception("Erreur lors de l'ajout du matériau/outil");
+    }
+  }
 }
