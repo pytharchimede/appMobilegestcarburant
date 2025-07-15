@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:http_parser/http_parser.dart';
 
 class ApiService {
   static const String baseUrl = 'https://fidest.ci/decaissement/api/api.php';
@@ -271,7 +271,6 @@ class ApiService {
         await http.MultipartFile.fromPath(
           'logo',
           logo.path,
-          contentType: MediaType('image', logo.path.split('.').last),
         ),
       );
     }
@@ -306,7 +305,6 @@ class ApiService {
         await http.MultipartFile.fromPath(
           'photo',
           photo.path,
-          contentType: MediaType('image', photo.path.split('.').last),
         ),
       );
     }
@@ -651,6 +649,81 @@ class ApiService {
       return data['status'] == 'success';
     } else {
       throw Exception("Erreur lors de l'ajout du matériel de bureau");
+    }
+  }
+
+  // Récupérer la liste des inventaires (optionnel: filtrer par date)
+  Future<List<Map<String, dynamic>>> fetchInventaireStock(
+      {DateTime? date}) async {
+    final params = <String, String>{'endpoint': 'inventaire_stock'};
+    if (date != null) {
+      params['date'] = date.toIso8601String().substring(0, 10);
+    }
+    final uri = Uri.parse(baseUrl).replace(queryParameters: params);
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des inventaires");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des inventaires");
+    }
+  }
+
+  // Récupérer la liste des catégories d'inventaire
+  Future<List<Map<String, dynamic>>> fetchInventaireStockCategories() async {
+    final response = await http
+        .get(Uri.parse('$baseUrl?endpoint=inventaire_stock_categories'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des catégories");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des catégories");
+    }
+  }
+
+  // Ajouter un inventaire (avec upload photo)
+  Future<bool> ajouterInventaireStock({
+    required DateTime date,
+    required String categorie, // id ou libellé
+    required String designation,
+    required int quantite,
+    required String emplacement,
+    required String qrcode,
+    XFile? photo,
+  }) async {
+    var uri = Uri.parse('$baseUrl?endpoint=ajouter_inventaire_stock');
+    var request = http.MultipartRequest('POST', uri);
+    request.fields['date_inventaire'] = date.toIso8601String().substring(0, 10);
+    request.fields['categorie'] = categorie;
+    request.fields['designation'] = designation;
+    request.fields['quantite'] = quantite.toString();
+    request.fields['emplacement'] = emplacement;
+    request.fields['qrcode'] = qrcode;
+    if (photo != null) {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'photo',
+          photo.path,
+        ),
+      );
+    }
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['status'] == 'success';
+    } else {
+      throw Exception("Erreur lors de l'ajout de l'inventaire");
     }
   }
 }

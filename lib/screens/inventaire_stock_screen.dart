@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import '../services/api_services.dart';
 
 class InventaireStockScreen extends StatefulWidget {
   const InventaireStockScreen({Key? key}) : super(key: key);
@@ -12,41 +13,17 @@ class InventaireStockScreen extends StatefulWidget {
 }
 
 class _InventaireStockScreenState extends State<InventaireStockScreen> {
-  final List<String> categories = [
-    "Carburant",
-    "Matériau de construction",
-    "Outil à main",
-    "Mobilier",
-    "Informatique",
-    "Divers",
-  ];
-
-  List<Map<String, dynamic>> inventaires = [
-    {
-      "date": DateTime(2025, 7, 10),
-      "categorie": "Carburant",
-      "designation": "Gasoil",
-      "quantite": 1200,
-      "emplacement": "Citerne principale",
-      "photo": null,
-      "qrcode": "INV-20250710-001",
-    },
-    {
-      "date": DateTime(2025, 7, 12),
-      "categorie": "Mobilier",
-      "designation": "Chaise de bureau",
-      "quantite": 10,
-      "emplacement": "Bureau direction",
-      "photo": null,
-      "qrcode": "INV-20250712-002",
-    },
-  ];
+  final ApiService apiService = ApiService();
 
   DateTime? _selectedDate;
 
+  List<Map<String, dynamic>> categories = [];
+  List<Map<String, dynamic>> inventaires = [];
+
   void _ajouterInventaire() async {
     DateTime date = DateTime.now();
-    String? selectedCategorie = categories.first;
+    String? selectedCategorie =
+        categories.isNotEmpty ? categories.first['libelle'] : null;
     final designationController = TextEditingController();
     final quantiteController = TextEditingController();
     final emplacementController = TextEditingController();
@@ -57,8 +34,10 @@ class _InventaireStockScreenState extends State<InventaireStockScreen> {
       builder: (_) => StatefulBuilder(
         builder: (context, setStateDialog) => AlertDialog(
           backgroundColor: Color(0xFF223C4A),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text("Nouvel inventaire", style: TextStyle(color: Colors.white)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title:
+              Text("Nouvel inventaire", style: TextStyle(color: Colors.white)),
           content: SingleChildScrollView(
             child: Column(
               children: [
@@ -67,7 +46,8 @@ class _InventaireStockScreenState extends State<InventaireStockScreen> {
                     Text("Date :", style: TextStyle(color: Colors.white)),
                     SizedBox(width: 8),
                     TextButton(
-                      style: TextButton.styleFrom(foregroundColor: Colors.green),
+                      style:
+                          TextButton.styleFrom(foregroundColor: Colors.green),
                       child: Text("${date.day}/${date.month}/${date.year}"),
                       onPressed: () async {
                         final picked = await showDatePicker(
@@ -97,11 +77,13 @@ class _InventaireStockScreenState extends State<InventaireStockScreen> {
                     style: TextStyle(color: Colors.white),
                     items: categories
                         .map((cat) => DropdownMenuItem<String>(
-                              value: cat,
-                              child: Text(cat, style: TextStyle(color: Colors.white)),
+                              value: cat['libelle'],
+                              child: Text(cat['libelle'],
+                                  style: TextStyle(color: Colors.white)),
                             ))
                         .toList(),
-                    onChanged: (val) => setStateDialog(() => selectedCategorie = val),
+                    onChanged: (val) =>
+                        setStateDialog(() => selectedCategorie = val),
                   ),
                 ),
                 _textField("Désignation", designationController),
@@ -119,12 +101,15 @@ class _InventaireStockScreenState extends State<InventaireStockScreen> {
                       ),
                     ),
                     TextButton(
-                      style: TextButton.styleFrom(foregroundColor: Colors.green),
+                      style:
+                          TextButton.styleFrom(foregroundColor: Colors.green),
                       child: Text("Prendre photo"),
                       onPressed: () async {
                         final picker = ImagePicker();
-                        final picked = await picker.pickImage(source: ImageSource.camera);
-                        if (picked != null) setStateDialog(() => photo = picked);
+                        final picked =
+                            await picker.pickImage(source: ImageSource.camera);
+                        if (picked != null)
+                          setStateDialog(() => photo = picked);
                       },
                     ),
                   ],
@@ -140,20 +125,26 @@ class _InventaireStockScreenState extends State<InventaireStockScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
               child: Text("Ajouter"),
-              onPressed: () {
-                final qrcode = "INV-${DateFormat('yyyyMMdd').format(date)}-${inventaires.length + 1}";
-                setState(() {
-                  inventaires.add({
-                    "date": date,
-                    "categorie": selectedCategorie ?? "",
-                    "designation": designationController.text,
-                    "quantite": int.tryParse(quantiteController.text) ?? 0,
-                    "emplacement": emplacementController.text,
-                    "photo": photo,
-                    "qrcode": qrcode,
-                  });
-                });
-                Navigator.pop(context);
+              onPressed: () async {
+                final qrcode =
+                    "INV-${DateFormat('yyyyMMdd').format(date)}-${inventaires.length + 1}";
+                final ok = await apiService.ajouterInventaireStock(
+                  date: date,
+                  categorie: selectedCategorie ?? "",
+                  designation: designationController.text,
+                  quantite: int.tryParse(quantiteController.text) ?? 0,
+                  emplacement: emplacementController.text,
+                  qrcode: qrcode,
+                  photo: photo,
+                );
+                if (ok) {
+                  await _loadData();
+                  Navigator.pop(context);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Erreur lors de l'ajout")),
+                  );
+                }
               },
             ),
           ],
@@ -162,7 +153,8 @@ class _InventaireStockScreenState extends State<InventaireStockScreen> {
     );
   }
 
-  Widget _textField(String label, TextEditingController controller, {bool isNumber = false}) {
+  Widget _textField(String label, TextEditingController controller,
+      {bool isNumber = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: TextField(
@@ -179,11 +171,29 @@ class _InventaireStockScreenState extends State<InventaireStockScreen> {
 
   List<Map<String, dynamic>> get _inventairesFiltres {
     if (_selectedDate == null) return inventaires;
-    return inventaires.where((inv) =>
-      inv['date'].year == _selectedDate!.year &&
-      inv['date'].month == _selectedDate!.month &&
-      inv['date'].day == _selectedDate!.day
-    ).toList();
+    return inventaires
+        .where((inv) =>
+            inv['date'].year == _selectedDate!.year &&
+            inv['date'].month == _selectedDate!.month &&
+            inv['date'].day == _selectedDate!.day)
+        .toList();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      // Optionnel : booléen isLoading si tu veux un loader
+    });
+    try {
+      categories = await apiService.fetchInventaireStockCategories();
+      inventaires = await apiService.fetchInventaireStock(
+        date: _selectedDate, // ou null pour tout
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Erreur lors du chargement : $e")),
+      );
+    }
+    setState(() {});
   }
 
   @override
@@ -240,7 +250,9 @@ class _InventaireStockScreenState extends State<InventaireStockScreen> {
           ),
           Expanded(
             child: _inventairesFiltres.isEmpty
-                ? Center(child: Text("Aucun inventaire", style: TextStyle(color: Colors.white54)))
+                ? Center(
+                    child: Text("Aucun inventaire",
+                        style: TextStyle(color: Colors.white54)))
                 : ListView.separated(
                     padding: EdgeInsets.all(16),
                     itemCount: _inventairesFiltres.length,
@@ -250,7 +262,8 @@ class _InventaireStockScreenState extends State<InventaireStockScreen> {
                       return Card(
                         color: Color(0xFF223C4A),
                         child: ListTile(
-                          leading: inv['photo'] == null
+                          leading: (inv['photo'] == null ||
+                                  inv['photo'].isEmpty)
                               ? Icon(Icons.inventory, color: Colors.greenAccent)
                               : GestureDetector(
                                   onTap: () {
@@ -258,24 +271,33 @@ class _InventaireStockScreenState extends State<InventaireStockScreen> {
                                       context: context,
                                       builder: (_) => Dialog(
                                         backgroundColor: Colors.black,
-                                        child: Image.file(File(inv['photo'].path)),
+                                        child: Image.network(
+                                            'https://fidest.ci/decaissement/uploads/${inv['photo']}'),
                                       ),
                                     );
                                   },
                                   child: CircleAvatar(
-                                    backgroundImage: FileImage(File(inv['photo'].path)),
+                                    backgroundImage: NetworkImage(
+                                        'https://fidest.ci/decaissement/uploads/${inv['photo']}'),
                                     radius: 22,
                                   ),
                                 ),
                           title: Text(inv['designation'],
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold)),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text("Catégorie : ${inv['categorie']}", style: TextStyle(color: Colors.white70)),
-                              Text("Quantité : ${inv['quantite']}", style: TextStyle(color: Colors.white70)),
-                              Text("Emplacement : ${inv['emplacement']}", style: TextStyle(color: Colors.white70)),
-                              Text("Date : ${DateFormat('dd/MM/yyyy').format(inv['date'])}", style: TextStyle(color: Colors.white70)),
+                              Text("Catégorie : ${inv['categorie']}",
+                                  style: TextStyle(color: Colors.white70)),
+                              Text("Quantité : ${inv['quantite']}",
+                                  style: TextStyle(color: Colors.white70)),
+                              Text("Emplacement : ${inv['emplacement']}",
+                                  style: TextStyle(color: Colors.white70)),
+                              Text(
+                                  "Date : ${DateFormat('dd/MM/yyyy').format(DateTime.parse(inv['date_inventaire']))}",
+                                  style: TextStyle(color: Colors.white70)),
                               SizedBox(height: 4),
                               Row(
                                 children: [
@@ -285,7 +307,9 @@ class _InventaireStockScreenState extends State<InventaireStockScreen> {
                                     backgroundColor: Colors.white,
                                   ),
                                   SizedBox(width: 8),
-                                  Text("QR Code", style: TextStyle(color: Colors.greenAccent)),
+                                  Text("QR Code",
+                                      style:
+                                          TextStyle(color: Colors.greenAccent)),
                                 ],
                               ),
                             ],
@@ -300,7 +324,12 @@ class _InventaireStockScreenState extends State<InventaireStockScreen> {
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.green,
         child: Icon(Icons.add),
-        onPressed: _ajouterInventaire,
+        onPressed: () async {
+          if (categories.isEmpty) {
+            await _loadData();
+          }
+          _ajouterInventaire();
+        },
         tooltip: "Nouvel inventaire",
       ),
     );
