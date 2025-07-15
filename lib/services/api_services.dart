@@ -42,17 +42,23 @@ class ApiService {
  * Récupère l'évolution du solde sur 30 jours.
  * Retourne une liste de maps avec les jours et les soldes correspondants.
  */
-  Future<List<Map<String, dynamic>>> fetchSoldeEvolution() async {
-    final response =
-        await http.get(Uri.parse('$baseUrl?endpoint=solde_evolution'));
+  Future<List<Map<String, dynamic>>> fetchSoldeEvolution(
+      {int? annee, int? mois}) async {
+    final params = <String, String>{'endpoint': 'solde_evolution'};
+    if (annee != null) params['annee'] = annee.toString();
+    if (mois != null) params['mois'] = mois.toString();
+
+    final uri = Uri.parse(baseUrl).replace(queryParameters: params);
+    final response = await http.get(uri);
+
     if (response.statusCode == 200) {
-      final List<dynamic> data = json.decode(response.body);
-      return data
-          .map((e) => {
-                'jour': e['jour'],
-                'solde': (e['solde'] as num).toDouble(),
-              })
-          .toList();
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(data['message'] ??
+            "Erreur lors du chargement de l'évolution du solde");
+      }
     } else {
       throw Exception('Erreur lors du chargement de l\'évolution du solde');
     }

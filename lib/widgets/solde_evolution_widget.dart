@@ -120,6 +120,7 @@ class _SoldeEvolutionWidgetState extends State<SoldeEvolutionWidget> {
                   ),
                   borderData: FlBorderData(show: false),
                   lineBarsData: [
+                    // Solde (ligne principale)
                     LineChartBarData(
                       isCurved: true,
                       color: Color(0xFF00A9A5),
@@ -134,9 +135,50 @@ class _SoldeEvolutionWidgetState extends State<SoldeEvolutionWidget> {
                               (point['solde'] as num).toDouble()))
                           .toList(),
                     ),
+                    // Entrées (optionnel, en pointillés)
+                    LineChartBarData(
+                      isCurved: false,
+                      color: Colors.greenAccent,
+                      barWidth: 1,
+                      isStrokeCapRound: true,
+                      dashArray: [5, 5],
+                      spots: donnees
+                          .map((point) => FlSpot(
+                              (point['jour'] as num).toDouble(),
+                              (point['entree'] as num).toDouble()))
+                          .toList(),
+                    ),
+                    // Sorties (optionnel, en pointillés)
+                    LineChartBarData(
+                      isCurved: false,
+                      color: Colors.redAccent,
+                      barWidth: 1,
+                      isStrokeCapRound: true,
+                      dashArray: [5, 5],
+                      spots: donnees
+                          .map((point) => FlSpot(
+                              (point['jour'] as num).toDouble(),
+                              (point['sortie'] as num).toDouble()))
+                          .toList(),
+                    ),
                   ],
                 ),
               ),
+            ),
+            Row(
+              children: [
+                Icon(Icons.show_chart, color: Color(0xFF00A9A5), size: 16),
+                Text(" Solde",
+                    style: TextStyle(color: Colors.white54, fontSize: 12)),
+                SizedBox(width: 12),
+                Icon(Icons.show_chart, color: Colors.greenAccent, size: 16),
+                Text(" Entrées",
+                    style: TextStyle(color: Colors.white54, fontSize: 12)),
+                SizedBox(width: 12),
+                Icon(Icons.show_chart, color: Colors.redAccent, size: 16),
+                Text(" Sorties",
+                    style: TextStyle(color: Colors.white54, fontSize: 12)),
+              ],
             ),
           ],
         ),
