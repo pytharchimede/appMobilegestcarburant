@@ -200,6 +200,19 @@ class ApiService {
     }
   }
 
+  Future<bool> accepterDemandeCarburant(String numFiche) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl?endpoint=accepter_demande_carburant'),
+      body: {'num_fiche': numFiche},
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['status'] == 'success';
+    } else {
+      throw Exception("Erreur lors de l'acceptation");
+    }
+  }
+
 // Récupérer tous les véhicules/engins
   Future<List<Map<String, dynamic>>> fetchVehicules() async {
     final response = await http.get(Uri.parse('$baseUrl?endpoint=vehicules'));

@@ -118,10 +118,33 @@ class _DemandesEnAttenteScreenState extends State<DemandesEnAttenteScreen> {
                               MaterialPageRoute(
                                 builder: (_) => DemandeDetailScreen(
                                   demande: demande,
-                                  onAccept: () {
-                                    // Appelle ton API pour accepter
-                                    Navigator.pop(context);
-                                    _loadDemandes();
+                                  onAccept: () async {
+                                    try {
+                                      final ok = await apiService
+                                          .accepterDemandeCarburant(
+                                              demande['num_fiche']
+                                                  .toString());
+                                      if (ok) {
+                                        Navigator.pop(context);
+                                        _loadDemandes();
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                              content: Text(
+                                                  "Demande acceptée avec succès")),
+                                        );
+                                      } else {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                              content: Text(
+                                                  "Erreur lors de l'acceptation")),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                            content: Text("Erreur API : $e")),
+                                      );
+                                    }
                                   },
                                   onRefuse: () {
                                     // Appelle ton API pour refuser
