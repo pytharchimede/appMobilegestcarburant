@@ -726,4 +726,69 @@ class ApiService {
       throw Exception("Erreur lors de l'ajout de l'inventaire");
     }
   }
+
+  // Récupérer la liste valorisée des stocks
+  Future<Map<String, dynamic>> fetchValorisationStocks() async {
+    final response =
+        await http.get(Uri.parse('$baseUrl?endpoint=valorisation_stocks'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return {
+          'total': data['total'] ?? 0,
+          'stocks': List<Map<String, dynamic>>.from(data['data']),
+        };
+      } else {
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des stocks");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des stocks");
+    }
+  }
+
+// Récupérer les catégories de stock
+  Future<List<Map<String, dynamic>>> fetchStockCategories() async {
+    final response =
+        await http.get(Uri.parse('$baseUrl?endpoint=stock_categories'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des catégories");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des catégories");
+    }
+  }
+
+// Ajouter ou modifier un stock
+  Future<bool> ajouterOuModifierStock({
+    int? id,
+    required String categorie, // id ou libellé
+    required String designation,
+    required int quantite,
+    required int prixUnitaire,
+    required String emplacement,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl?endpoint=ajouter_ou_modifier_stock'),
+      body: {
+        if (id != null) 'id': id.toString(),
+        'categorie': categorie,
+        'designation': designation,
+        'quantite': quantite.toString(),
+        'prix_unitaire': prixUnitaire.toString(),
+        'emplacement': emplacement,
+      },
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['status'] == 'success';
+    } else {
+      throw Exception("Erreur lors de l'ajout/modification du stock");
+    }
+  }
 }
