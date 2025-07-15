@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
+import '../services/api_services.dart';
 
 class RapportJournalierScreen extends StatefulWidget {
   const RapportJournalierScreen({Key? key}) : super(key: key);
@@ -18,47 +19,45 @@ class RapportJournalierScreen extends StatefulWidget {
 class _RapportJournalierScreenState extends State<RapportJournalierScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
+  final ApiService apiService = ApiService();
 
-  // Simule les plannings du jour (à lier à ton planning réel si besoin)
-  Map<String, List<Map<String, String>>> rapports = {
-    "2025-07-10": [
-      {
-        "tache": "Réception livraison carburant",
-        "responsable": "M. Yao",
-        "heure": "08:00",
-        "etat": "Non démarré",
-        "commentaire": "",
-      },
-      {
-        "tache": "Entretien camion",
-        "responsable": "M. Traoré",
-        "heure": "14:00",
-        "etat": "Non démarré",
-        "commentaire": "",
-      },
-    ],
-    "2025-07-11": [
-      {
-        "tache": "Inventaire matériel",
-        "responsable": "Mme Kone",
-        "heure": "09:00",
-        "etat": "Non démarré",
-        "commentaire": "",
-      },
-    ],
-  };
+  Map<String, List<Map<String, dynamic>>> rapports = {};
+  bool isLoading = true;
+  String? error;
 
-  List<Map<String, String>> get _rapportDuJour {
-    final key =
-        (_selectedDay ?? _focusedDay).toIso8601String().substring(0, 10);
+  @override
+  void initState() {
+    super.initState();
+    _loadRapports();
+  }
+
+  Future<void> _loadRapports() async {
+    setState(() {
+      isLoading = true;
+      error = null;
+    });
+    try {
+      rapports = await apiService.fetchRapportsJournalier(
+        dateDebut: _focusedDay,
+        dateFin: _focusedDay,
+      );
+    } catch (e) {
+      error = e.toString();
+    }
+    setState(() {
+      isLoading = false;
+    });
+  }
+
+  List<Map<String, dynamic>> get _rapportDuJour {
+    final key = (_selectedDay ?? _focusedDay).toIso8601String().substring(0, 10);
     return rapports[key] ?? [];
   }
 
   void _modifierEtatRapport(int index) async {
     final rapport = _rapportDuJour[index];
     String etat = rapport['etat'] ?? "Non démarré";
-    final commentaireController =
-        TextEditingController(text: rapport['commentaire'] ?? "");
+    final commentaireController = TextEditingController(text: rapport['commentaire'] ?? "");
 
     await showDialog(
       context: context,
@@ -108,16 +107,22 @@ class _RapportJournalierScreenState extends State<RapportJournalierScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             child: Text("Valider"),
-            onPressed: () {
-              final key = (_selectedDay ?? _focusedDay)
-                  .toIso8601String()
-                  .substring(0, 10);
-              setState(() {
-                rapports[key]![index]['etat'] = etat;
-                rapports[key]![index]['commentaire'] =
-                    commentaireController.text;
-              });
-              Navigator.pop(context);
+            onPressed: () async {
+              final key = (_selectedDay ?? _focusedDay).toIso8601String().substring(0, 10);
+              final ok = await apiService.updateRapportJournalier(
+                planningLineId: rapport['planning_line_id'],
+                dateRapport: key,
+                etat: etat,
+                commentaire: commentaireController.text,
+              );
+              if (ok) {
+                Navigator.pop(context);
+                await _loadRapports();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Erreur lors de la mise à jour")),
+                );
+              }
             },
           ),
         ],
@@ -292,64 +297,70 @@ class _RapportJournalierScreenState extends State<RapportJournalierScreen> {
             ),
           ),
           Expanded(
-            child: _rapportDuJour.isEmpty
-                ? Center(
-                    child: Text("Aucune tâche prévue",
-                        style: TextStyle(color: Colors.white54)))
-                : ListView.separated(
-                    itemCount: _rapportDuJour.length,
-                    separatorBuilder: (_, __) => Divider(color: Colors.white24),
-                    itemBuilder: (context, index) {
-                      final rapport = _rapportDuJour[index];
-                      return ListTile(
-                        leading:
-                            Icon(Icons.event_note, color: Colors.greenAccent),
-                        title: Text(rapport['tache'] ?? '',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold)),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "Responsable : ${rapport['responsable'] ?? ''}\nHeure : ${rapport['heure'] ?? ''}",
-                              style: TextStyle(color: Colors.white70),
-                            ),
-                            SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Text(
-                                  "État : ",
-                                  style: TextStyle(
-                                      color: Colors.white70,
-                                      fontWeight: FontWeight.bold),
+            child: isLoading
+                ? Center(child: CircularProgressIndicator(color: Colors.white))
+                : error != null
+                    ? Center(
+                        child: Text("Erreur: $error",
+                            style: TextStyle(color: Colors.redAccent)))
+                    : _rapportDuJour.isEmpty
+                        ? Center(
+                            child: Text("Aucune tâche prévue",
+                                style: TextStyle(color: Colors.white54)))
+                        : ListView.separated(
+                            itemCount: _rapportDuJour.length,
+                            separatorBuilder: (_, __) => Divider(color: Colors.white24),
+                            itemBuilder: (context, index) {
+                              final rapport = _rapportDuJour[index];
+                              return ListTile(
+                                leading:
+                                    Icon(Icons.event_note, color: Colors.greenAccent),
+                                title: Text(rapport['tache'] ?? '',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold)),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "Responsable : ${rapport['responsable'] ?? ''}\nHeure : ${rapport['heure'] ?? ''}",
+                                      style: TextStyle(color: Colors.white70),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Text(
+                                          "État : ",
+                                          style: TextStyle(
+                                              color: Colors.white70,
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                        Text(
+                                          rapport['etat'] ?? "Non démarré",
+                                          style: TextStyle(
+                                            color: _etatColor(rapport['etat']),
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if ((rapport['commentaire'] ?? '').isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2.0),
+                                        child: Text(
+                                          "Commentaire : ${rapport['commentaire']}",
+                                          style: TextStyle(
+                                              color: Colors.white54,
+                                              fontStyle: FontStyle.italic,
+                                              fontSize: 13),
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                                Text(
-                                  rapport['etat'] ?? "Non démarré",
-                                  style: TextStyle(
-                                    color: _etatColor(rapport['etat']),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if ((rapport['commentaire'] ?? '').isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2.0),
-                                child: Text(
-                                  "Commentaire : ${rapport['commentaire']}",
-                                  style: TextStyle(
-                                      color: Colors.white54,
-                                      fontStyle: FontStyle.italic,
-                                      fontSize: 13),
-                                ),
-                              ),
-                          ],
-                        ),
-                        onTap: () => _modifierEtatRapport(index),
-                      );
-                    },
-                  ),
+                                onTap: () => _modifierEtatRapport(index),
+                              );
+                            },
+                          ),
           ),
         ],
       ),

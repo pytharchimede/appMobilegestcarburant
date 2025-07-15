@@ -410,4 +410,62 @@ class ApiService {
       throw Exception("Erreur lors de l'ajout de la tâche");
     }
   }
+
+// Récupérer les rapports du jour (synchronisés avec le planning)
+Future<Map<String, List<Map<String, dynamic>>>> fetchRapportsJournalier({
+  DateTime? dateDebut,
+  DateTime? dateFin,
+}) async {
+  final params = <String, String>{'endpoint': 'rapport_journalier'};
+  if (dateDebut != null) params['date_debut'] = dateDebut.toIso8601String().substring(0, 10);
+  if (dateFin != null) params['date_fin'] = dateFin.toIso8601String().substring(0, 10);
+
+  final uri = Uri.parse(baseUrl).replace(queryParameters: params);
+  final response = await http.get(uri);
+
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+    if (data['status'] == 'success' && data['data'] != null) {
+      if (data['data'] is Map) {
+        final raw = data['data'] as Map<String, dynamic>;
+        return raw.map((k, v) => MapEntry(
+          k,
+          List<Map<String, dynamic>>.from(
+            (v as List).map((e) => Map<String, dynamic>.from(e)),
+          ),
+        ));
+      } else {
+        return {};
+      }
+    } else {
+      throw Exception(data['message'] ?? "Erreur lors du chargement des rapports");
+    }
+  } else {
+    throw Exception('Erreur lors du chargement des rapports');
+  }
+}
+
+// Mettre à jour ou créer un rapport pour une tâche planifiée
+Future<bool> updateRapportJournalier({
+  required int planningLineId,
+  required String dateRapport,
+  required String etat,
+  String? commentaire,
+}) async {
+  final response = await http.post(
+    Uri.parse('$baseUrl?endpoint=rapport_journalier'),
+    body: {
+      'planning_line_id': planningLineId.toString(),
+      'date_rapport': dateRapport,
+      'etat': etat,
+      'commentaire': commentaire ?? '',
+    },
+  );
+  if (response.statusCode == 200) {
+    final data = json.decode(response.body);
+    return data['status'] == 'success';
+  } else {
+    throw Exception("Erreur lors de la mise à jour du rapport");
+  }
+}
 }
