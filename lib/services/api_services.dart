@@ -355,4 +355,59 @@ class ApiService {
       throw Exception("Erreur lors du chargement des pièces");
     }
   }
+
+  // Récupérer le planning (par période ou tout le mois)
+  Future<Map<String, List<Map<String, String>>>> fetchPlanning({
+    DateTime? dateDebut,
+    DateTime? dateFin,
+  }) async {
+    final params = <String, String>{'endpoint': 'planning'};
+    if (dateDebut != null) params['date_debut'] = dateDebut.toIso8601String().substring(0, 10);
+    if (dateFin != null) params['date_fin'] = dateFin.toIso8601String().substring(0, 10);
+
+    final uri = Uri.parse(baseUrl).replace(queryParameters: params);
+    final response = await http.get(uri);
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        // Correction ici :
+        final raw = data['data'] as Map<String, dynamic>;
+        return raw.map((k, v) => MapEntry(
+          k,
+          List<Map<String, String>>.from(
+            (v as List).map((e) => Map<String, String>.from(e)),
+          ),
+        ));
+      } else {
+        throw Exception(data['message'] ?? "Erreur lors du chargement du planning");
+      }
+    } else {
+      throw Exception('Erreur lors du chargement du planning');
+    }
+  }
+
+// Ajouter une tâche au planning
+  Future<bool> ajouterPlanning({
+    required String datePlanning,
+    required String tache,
+    required String responsable,
+    required String heure,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl?endpoint=planning'),
+      body: {
+        'date_planning': datePlanning,
+        'tache': tache,
+        'responsable': responsable,
+        'heure': heure,
+      },
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['status'] == 'success';
+    } else {
+      throw Exception("Erreur lors de l'ajout de la tâche");
+    }
+  }
 }

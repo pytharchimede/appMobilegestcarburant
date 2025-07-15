@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:open_file/open_file.dart';
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
+import '../services/api_services.dart'; // Assurez-vous d'importer votre service API
 
 class PlanningScreen extends StatefulWidget {
   const PlanningScreen({Key? key}) : super(key: key);
@@ -17,19 +18,35 @@ class PlanningScreen extends StatefulWidget {
 class _PlanningScreenState extends State<PlanningScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  Map<String, List<Map<String, String>>> plannings = {
-    // Exemple de données simulées
-    "2025-07-10": [
-      {"tache": "Réception livraison carburant", "responsable": "M. Yao", "heure": "08:00"},
-      {"tache": "Entretien camion", "responsable": "M. Traoré", "heure": "14:00"},
-    ],
-    "2025-07-11": [
-      {"tache": "Inventaire matériel", "responsable": "Mme Kone", "heure": "09:00"},
-    ],
-  };
+  final ApiService apiService = ApiService();
+  Map<String, List<Map<String, String>>> plannings = {};
+  bool isLoading = true;
+  String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPlanning();
+  }
+
+  Future<void> _loadPlanning() async {
+    setState(() {
+      isLoading = true;
+      error = null;
+    });
+    try {
+      plannings = await apiService.fetchPlanning();
+    } catch (e) {
+      error = e.toString();
+    }
+    setState(() {
+      isLoading = false;
+    });
+  }
 
   List<Map<String, String>> get _planningDuJour {
-    final key = (_selectedDay ?? _focusedDay).toIso8601String().substring(0, 10);
+    final key =
+        (_selectedDay ?? _focusedDay).toIso8601String().substring(0, 10);
     return plannings[key] ?? [];
   }
 
@@ -48,17 +65,23 @@ class _PlanningScreenState extends State<PlanningScreen> {
           children: [
             TextField(
               controller: tacheController,
-              decoration: InputDecoration(labelText: "Tâche", labelStyle: TextStyle(color: Colors.white)),
+              decoration: InputDecoration(
+                  labelText: "Tâche",
+                  labelStyle: TextStyle(color: Colors.white)),
               style: TextStyle(color: Colors.white),
             ),
             TextField(
               controller: responsableController,
-              decoration: InputDecoration(labelText: "Responsable", labelStyle: TextStyle(color: Colors.white)),
+              decoration: InputDecoration(
+                  labelText: "Responsable",
+                  labelStyle: TextStyle(color: Colors.white)),
               style: TextStyle(color: Colors.white),
             ),
             TextField(
               controller: heureController,
-              decoration: InputDecoration(labelText: "Heure", labelStyle: TextStyle(color: Colors.white)),
+              decoration: InputDecoration(
+                  labelText: "Heure",
+                  labelStyle: TextStyle(color: Colors.white)),
               style: TextStyle(color: Colors.white),
             ),
           ],
@@ -71,17 +94,24 @@ class _PlanningScreenState extends State<PlanningScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             child: Text("Ajouter"),
-            onPressed: () {
-              final key = (_selectedDay ?? _focusedDay).toIso8601String().substring(0, 10);
-              setState(() {
-                plannings.putIfAbsent(key, () => []);
-                plannings[key]!.add({
-                  "tache": tacheController.text,
-                  "responsable": responsableController.text,
-                  "heure": heureController.text,
-                });
-              });
-              Navigator.pop(context);
+            onPressed: () async {
+              final key = (_selectedDay ?? _focusedDay)
+                  .toIso8601String()
+                  .substring(0, 10);
+              final ok = await apiService.ajouterPlanning(
+                datePlanning: key,
+                tache: tacheController.text,
+                responsable: responsableController.text,
+                heure: heureController.text,
+              );
+              if (ok) {
+                Navigator.pop(context);
+                await _loadPlanning();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Erreur lors de l'ajout")),
+                );
+              }
             },
           ),
         ],
@@ -91,7 +121,8 @@ class _PlanningScreenState extends State<PlanningScreen> {
 
   Future<void> _exporterExcel() async {
     final excel = Excel.createExcel();
-    final key = (_selectedDay ?? _focusedDay).toIso8601String().substring(0, 10);
+    final key =
+        (_selectedDay ?? _focusedDay).toIso8601String().substring(0, 10);
     final sheet = excel['Planning $key'];
     sheet.appendRow(['Tâche', 'Responsable', 'Heure']);
     for (var plan in _planningDuJour) {
@@ -105,17 +136,23 @@ class _PlanningScreenState extends State<PlanningScreen> {
 
   Future<void> _exporterPDF() async {
     final pdf = pw.Document();
-    final key = (_selectedDay ?? _focusedDay).toIso8601String().substring(0, 10);
+    final key =
+        (_selectedDay ?? _focusedDay).toIso8601String().substring(0, 10);
     pdf.addPage(
       pw.Page(
         build: (context) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Text('Planning du $key', style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+            pw.Text('Planning du $key',
+                style:
+                    pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 16),
-            pw.Table.fromTextArray(
+            pw.TableHelper.fromTextArray(
               headers: ['Tâche', 'Responsable', 'Heure'],
-              data: _planningDuJour.map((plan) => [plan['tache'], plan['responsable'], plan['heure']]).toList(),
+              data: _planningDuJour
+                  .map((plan) =>
+                      [plan['tache'], plan['responsable'], plan['heure']])
+                  .toList(),
             ),
           ],
         ),
@@ -200,7 +237,8 @@ class _PlanningScreenState extends State<PlanningScreen> {
               outsideTextStyle: TextStyle(color: Colors.white38),
             ),
             headerStyle: HeaderStyle(
-              titleTextStyle: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              titleTextStyle:
+                  TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               formatButtonVisible: false,
               leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
               rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
@@ -217,7 +255,10 @@ class _PlanningScreenState extends State<PlanningScreen> {
               children: [
                 Text(
                   "Planning du ${(_selectedDay ?? _focusedDay).day}/${(_selectedDay ?? _focusedDay).month}/${(_selectedDay ?? _focusedDay).year}",
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16),
                 ),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
@@ -232,23 +273,36 @@ class _PlanningScreenState extends State<PlanningScreen> {
             ),
           ),
           Expanded(
-            child: _planningDuJour.isEmpty
-                ? Center(child: Text("Aucune tâche prévue", style: TextStyle(color: Colors.white54)))
-                : ListView.separated(
-                    itemCount: _planningDuJour.length,
-                    separatorBuilder: (_, __) => Divider(color: Colors.white24),
-                    itemBuilder: (context, index) {
-                      final plan = _planningDuJour[index];
-                      return ListTile(
-                        leading: Icon(Icons.event_note, color: Colors.greenAccent),
-                        title: Text(plan['tache'] ?? '', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                        subtitle: Text(
-                          "Responsable : ${plan['responsable'] ?? ''}\nHeure : ${plan['heure'] ?? ''}",
-                          style: TextStyle(color: Colors.white70),
-                        ),
-                      );
-                    },
-                  ),
+            child: isLoading
+                ? Center(child: CircularProgressIndicator())
+                : error != null
+                    ? Center(
+                        child: Text(error!,
+                            style: TextStyle(color: Colors.redAccent)))
+                    : _planningDuJour.isEmpty
+                        ? Center(
+                            child: Text("Aucune tâche prévue",
+                                style: TextStyle(color: Colors.white54)))
+                        : ListView.separated(
+                            itemCount: _planningDuJour.length,
+                            separatorBuilder: (_, __) =>
+                                Divider(color: Colors.white24),
+                            itemBuilder: (context, index) {
+                              final plan = _planningDuJour[index];
+                              return ListTile(
+                                leading: Icon(Icons.event_note,
+                                    color: Colors.greenAccent),
+                                title: Text(plan['tache'] ?? '',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold)),
+                                subtitle: Text(
+                                  "Responsable : ${plan['responsable'] ?? ''}\nHeure : ${plan['heure'] ?? ''}",
+                                  style: TextStyle(color: Colors.white70),
+                                ),
+                              );
+                            },
+                          ),
           ),
         ],
       ),
