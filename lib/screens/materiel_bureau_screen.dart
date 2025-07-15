@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/api_services.dart';
 
 class MaterielBureauScreen extends StatefulWidget {
   const MaterielBureauScreen({Key? key}) : super(key: key);
@@ -8,34 +9,37 @@ class MaterielBureauScreen extends StatefulWidget {
 }
 
 class _MaterielBureauScreenState extends State<MaterielBureauScreen> {
-  // Liste JSON simulée pour les catégories
-  final List<Map<String, dynamic>> categories = [
-    {"id": 1, "libelle": "Mobilier"},
-    {"id": 2, "libelle": "Informatique"},
-    {"id": 3, "libelle": "Papeterie"},
-    {"id": 4, "libelle": "Accessoire"},
-  ];
+  final ApiService apiService = ApiService();
+  List<Map<String, dynamic>> categories = [];
+  List<Map<String, dynamic>> materiels = [];
+  bool isLoading = true;
+  String? error;
 
-  List<Map<String, dynamic>> materiels = [
-    {
-      "nom": "Chaise ergonomique",
-      "categorie": "Mobilier",
-      "etat": "Disponible",
-      "quantite": 10,
-      "emplacement": "Bureau direction",
-    },
-    {
-      "nom": "Ordinateur portable HP",
-      "categorie": "Informatique",
-      "etat": "En maintenance",
-      "quantite": 2,
-      "emplacement": "Salle informatique",
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      isLoading = true;
+      error = null;
+    });
+    try {
+      categories = await apiService.fetchMaterielBureauCategories();
+      materiels = await apiService.fetchMaterielBureau();
+    } catch (e) {
+      error = e.toString();
+    }
+    setState(() {
+      isLoading = false;
+    });
+  }
 
   void _ajouterMateriel() async {
     final nomController = TextEditingController();
-    String? selectedCategorie = categories.first['libelle'];
+    String? selectedCategorie = categories.isNotEmpty ? categories.first['libelle'] : null;
     final etatController = TextEditingController();
     final quantiteController = TextEditingController();
     final emplacementController = TextEditingController();
@@ -45,8 +49,7 @@ class _MaterielBureauScreenState extends State<MaterielBureauScreen> {
       builder: (_) => AlertDialog(
         backgroundColor: Color(0xFF223C4A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text("Ajouter un matériel de bureau",
-            style: TextStyle(color: Colors.white)),
+        title: Text("Ajouter un matériel de bureau", style: TextStyle(color: Colors.white)),
         content: SingleChildScrollView(
           child: Column(
             children: [
@@ -64,11 +67,12 @@ class _MaterielBureauScreenState extends State<MaterielBureauScreen> {
                   items: categories
                       .map((cat) => DropdownMenuItem<String>(
                             value: cat['libelle'] as String,
-                            child: Text(cat['libelle'] as String,
-                                style: TextStyle(color: Colors.white)),
+                            child: Text(cat['libelle'] as String, style: TextStyle(color: Colors.white)),
                           ))
                       .toList(),
-                  onChanged: (val) => setState(() => selectedCategorie = val),
+                  onChanged: (val) {
+                    selectedCategorie = val;
+                  },
                 ),
               ),
               _textField("État", etatController),
@@ -85,17 +89,28 @@ class _MaterielBureauScreenState extends State<MaterielBureauScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             child: Text("Ajouter"),
-            onPressed: () {
-              setState(() {
-                materiels.add({
-                  "nom": nomController.text,
-                  "categorie": selectedCategorie ?? "",
-                  "etat": etatController.text,
-                  "quantite": int.tryParse(quantiteController.text) ?? 1,
-                  "emplacement": emplacementController.text,
-                });
-              });
-              Navigator.pop(context);
+            onPressed: () async {
+              try {
+                final ok = await apiService.ajouterMaterielBureau(
+                  nom: nomController.text,
+                  categorie: selectedCategorie ?? "",
+                  etat: etatController.text,
+                  quantite: int.tryParse(quantiteController.text) ?? 1,
+                  emplacement: emplacementController.text,
+                );
+                if (ok) {
+                  Navigator.pop(context);
+                  await _loadData();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Erreur lors de l'ajout")),
+                  );
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Erreur API : $e")),
+                );
+              }
             },
           ),
         ],
@@ -103,8 +118,7 @@ class _MaterielBureauScreenState extends State<MaterielBureauScreen> {
     );
   }
 
-  Widget _textField(String label, TextEditingController controller,
-      {bool isNumber = false}) {
+  Widget _textField(String label, TextEditingController controller, {bool isNumber = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: TextField(
@@ -127,40 +141,36 @@ class _MaterielBureauScreenState extends State<MaterielBureauScreen> {
         backgroundColor: Color(0xFF17333F),
         title: Text("Matériel de bureau"),
       ),
-      body: materiels.isEmpty
-          ? Center(
-              child: Text("Aucun matériel de bureau",
-                  style: TextStyle(color: Colors.white54)))
-          : ListView.separated(
-              padding: EdgeInsets.all(16),
-              itemCount: materiels.length,
-              separatorBuilder: (_, __) => Divider(color: Colors.white24),
-              itemBuilder: (context, index) {
-                final m = materiels[index];
-                return Card(
-                  color: Color(0xFF223C4A),
-                  child: ListTile(
-                    leading: Icon(Icons.chair, color: Colors.greenAccent),
-                    title: Text(m['nom'],
-                        style: TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold)),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Catégorie : ${m['categorie']}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text("État : ${m['etat']}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text("Quantité : ${m['quantite']}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text("Emplacement : ${m['emplacement']}",
-                            style: TextStyle(color: Colors.white70)),
-                      ],
+      body: isLoading
+          ? Center(child: CircularProgressIndicator(color: Colors.white))
+          : error != null
+              ? Center(child: Text(error!, style: TextStyle(color: Colors.redAccent)))
+              : materiels.isEmpty
+                  ? Center(child: Text("Aucun matériel de bureau", style: TextStyle(color: Colors.white54)))
+                  : ListView.separated(
+                      padding: EdgeInsets.all(16),
+                      itemCount: materiels.length,
+                      separatorBuilder: (_, __) => Divider(color: Colors.white24),
+                      itemBuilder: (context, index) {
+                        final m = materiels[index];
+                        return Card(
+                          color: Color(0xFF223C4A),
+                          child: ListTile(
+                            leading: Icon(Icons.chair, color: Colors.greenAccent),
+                            title: Text(m['nom'], style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text("Catégorie : ${m['categorie']}", style: TextStyle(color: Colors.white70)),
+                                Text("État : ${m['etat']}", style: TextStyle(color: Colors.white70)),
+                                Text("Quantité : ${m['quantite']}", style: TextStyle(color: Colors.white70)),
+                                Text("Emplacement : ${m['emplacement']}", style: TextStyle(color: Colors.white70)),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  ),
-                );
-              },
-            ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.green,
         child: Icon(Icons.add),

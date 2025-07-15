@@ -593,4 +593,64 @@ class ApiService {
       throw Exception("Erreur lors de l'ajout du matériau/outil");
     }
   }
+
+  // Récupérer la liste du matériel de bureau
+  Future<List<Map<String, dynamic>>> fetchMaterielBureau() async {
+    final response =
+        await http.get(Uri.parse('$baseUrl?endpoint=materiel_bureau'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(data['message'] ??
+            "Erreur lors du chargement du matériel de bureau");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement du matériel de bureau");
+    }
+  }
+
+// Récupérer la liste des catégories de matériel de bureau
+  Future<List<Map<String, dynamic>>> fetchMaterielBureauCategories() async {
+    final response = await http
+        .get(Uri.parse('$baseUrl?endpoint=materiel_bureau_categories'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des catégories");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des catégories");
+    }
+  }
+
+// Ajouter un matériel de bureau
+  Future<bool> ajouterMaterielBureau({
+    required String nom,
+    required String categorie, // Peut être id ou libellé
+    required String etat,
+    required int quantite,
+    required String emplacement,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl?endpoint=ajouter_materiel_bureau'),
+      body: {
+        'nom': nom,
+        'categorie': categorie,
+        'etat': etat,
+        'quantite': quantite.toString(),
+        'emplacement': emplacement,
+      },
+    );
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['status'] == 'success';
+    } else {
+      throw Exception("Erreur lors de l'ajout du matériel de bureau");
+    }
+  }
 }
