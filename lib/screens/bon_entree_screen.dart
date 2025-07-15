@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../services/api_services.dart';
 
 class BonEntreeScreen extends StatefulWidget {
   const BonEntreeScreen({Key? key}) : super(key: key);
@@ -10,57 +11,10 @@ class BonEntreeScreen extends StatefulWidget {
 }
 
 class _BonEntreeScreenState extends State<BonEntreeScreen> {
-  // Liste de chantiers simulés
-  final List<Map<String, dynamic>> chantiers = [
-    {"id": 1, "libelle": "Chantier Siège"},
-    {"id": 2, "libelle": "Chantier Annexe"},
-    {"id": 3, "libelle": "Chantier Extension"},
-  ];
-
-  // Données de test pour les bons d'entrée
-  List<Map<String, dynamic>> bons = [
-    {
-      "numero": "BE-2025-001",
-      "date": DateTime(2025, 7, 10),
-      "fournisseur": "Société Carburant+",
-      "categorie": "Carburant",
-      "quantite": 500,
-      "piece": null,
-      "commentaire": "Livraison conforme",
-      "affectation": "En stock",
-      "chantierId": null,
-    },
-    {
-      "numero": "BE-2025-002",
-      "date": DateTime(2025, 7, 12),
-      "fournisseur": "Matériaux Express",
-      "categorie": "Ciment",
-      "quantite": 100,
-      "piece": null,
-      "commentaire": "",
-      "affectation": "Sur chantier",
-      "chantierId": 1,
-    },
-    {
-      "numero": "BE-2025-003",
-      "date": DateTime(2025, 7, 13),
-      "fournisseur": "Papeterie Pro",
-      "categorie": "Divers",
-      "quantite": 50,
-      "piece": null,
-      "commentaire": "Pour le bureau",
-      "affectation": "Pour le bureau",
-      "chantierId": null,
-    },
-  ];
-
-  final List<String> categories = [
-    "Carburant",
-    "Ciment",
-    "Fer à béton",
-    "Outils",
-    "Divers",
-  ];
+  final ApiService apiService = ApiService();
+  List<Map<String, dynamic>> chantiers = [];
+  List<String> categories = [];
+  List<Map<String, dynamic>> bons = [];
 
   final List<String> affectations = [
     "En stock",
@@ -69,13 +23,52 @@ class _BonEntreeScreenState extends State<BonEntreeScreen> {
     "Autre",
   ];
 
+  bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => isLoading = true);
+    try {
+      chantiers = await apiService.fetchChantiers();
+      categories = await apiService.fetchBonEntreeCategories();
+      bons = await apiService.fetchBonsEntree();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Erreur chargement : $e")),
+      );
+    }
+    setState(() => isLoading = false);
+  }
+
   void _ajouterBon() async {
+    print("ouvrir formulaire");
+    print("categories: $categories");
+    print("chantiers: $chantiers");
+
+    if (categories.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Aucune catégorie disponible")),
+      );
+      return;
+    }
+    if (chantiers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Aucun chantier disponible")),
+      );
+      return;
+    }
+
     final numeroController = TextEditingController();
     DateTime date = DateTime.now();
     final fournisseurController = TextEditingController();
     String? selectedCategorie = categories.first;
     String? selectedAffectation = affectations.first;
-    int? selectedChantierId = chantiers.first['id'];
+    int? selectedChantierId = int.tryParse(chantiers.first['id'].toString());
     final quantiteController = TextEditingController();
     final commentaireController = TextEditingController();
     XFile? pieceJointe;
@@ -170,15 +163,10 @@ class _BonEntreeScreenState extends State<BonEntreeScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 4.0),
                     child: DropdownButtonFormField<int>(
                       value: selectedChantierId,
-                      dropdownColor: Color(0xFF223C4A),
-                      decoration: InputDecoration(
-                        labelText: "Chantier",
-                        labelStyle: TextStyle(color: Colors.white),
-                      ),
-                      style: TextStyle(color: Colors.white),
+                      // ...
                       items: chantiers
                           .map((chantier) => DropdownMenuItem<int>(
-                                value: chantier['id'],
+                                value: int.tryParse(chantier['id'].toString()),
                                 child: Text(chantier['libelle'],
                                     style: TextStyle(color: Colors.white)),
                               ))
@@ -226,23 +214,34 @@ class _BonEntreeScreenState extends State<BonEntreeScreen> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
               child: Text("Ajouter"),
-              onPressed: () {
-                setState(() {
-                  bons.add({
-                    "numero": numeroController.text,
-                    "date": date,
-                    "fournisseur": fournisseurController.text,
-                    "categorie": selectedCategorie ?? "",
-                    "quantite": int.tryParse(quantiteController.text) ?? 0,
-                    "piece": pieceJointe,
-                    "commentaire": commentaireController.text,
-                    "affectation": selectedAffectation,
-                    "chantierId": selectedAffectation == "Sur chantier"
+              onPressed: () async {
+                try {
+                  final ok = await apiService.ajouterBonEntree(
+                    numero: numeroController.text,
+                    date: date,
+                    fournisseur: fournisseurController.text,
+                    categorie: selectedCategorie ?? "",
+                    quantite: int.tryParse(quantiteController.text) ?? 0,
+                    piece: pieceJointe,
+                    commentaire: commentaireController.text,
+                    affectation: selectedAffectation ?? "",
+                    chantierId: selectedAffectation == "Sur chantier"
                         ? selectedChantierId
                         : null,
-                  });
-                });
-                Navigator.pop(context);
+                  );
+                  if (ok) {
+                    Navigator.pop(context);
+                    await _loadData();
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("Erreur lors de l'ajout")),
+                    );
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Erreur API : $e")),
+                  );
+                }
               },
             ),
           ],
@@ -284,82 +283,98 @@ class _BonEntreeScreenState extends State<BonEntreeScreen> {
         backgroundColor: Color(0xFF17333F),
         title: Text("Bons d'entrée"),
       ),
-      body: bons.isEmpty
-          ? Center(
-              child: Text("Aucun bon d'entrée",
-                  style: TextStyle(color: Colors.white54)))
-          : ListView.separated(
-              padding: EdgeInsets.all(16),
-              itemCount: bons.length,
-              separatorBuilder: (_, __) => Divider(color: Colors.white24),
-              itemBuilder: (context, index) {
-                final b = bons[index];
-                return Card(
-                  color: Color(0xFF223C4A),
-                  child: ListTile(
-                    leading: Icon(Icons.input, color: Colors.greenAccent),
-                    title: Text(b['numero'],
-                        style: TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold)),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                            "Date : ${b['date'].day}/${b['date'].month}/${b['date'].year}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text("Fournisseur : ${b['fournisseur']}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text("Catégorie : ${b['categorie']}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text("Quantité : ${b['quantite']}",
-                            style: TextStyle(color: Colors.white70)),
-                        Text(
-                          "Affectation : ${b['affectation']}" +
-                              (b['affectation'] == "Sur chantier" &&
-                                      b['chantierId'] != null
-                                  ? " (${_libelleChantier(b['chantierId'])})"
-                                  : ""),
-                          style: TextStyle(color: Colors.white70),
+      body: isLoading
+          ? Center(child: CircularProgressIndicator())
+          : bons.isEmpty
+              ? Center(
+                  child: Text("Aucun bon d'entrée",
+                      style: TextStyle(color: Colors.white54)))
+              : ListView.separated(
+                  padding: EdgeInsets.all(16),
+                  itemCount: bons.length,
+                  separatorBuilder: (_, __) => Divider(color: Colors.white24),
+                  itemBuilder: (context, index) {
+                    final b = bons[index];
+                    final date =
+                        DateTime.tryParse(b['date'] ?? "") ?? DateTime.now();
+                    return Card(
+                      color: Color(0xFF223C4A),
+                      child: ListTile(
+                        leading: Icon(Icons.input, color: Colors.greenAccent),
+                        title: Text(
+                          b['numero'] ?? "",
+                          style: TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.bold),
                         ),
-                        if ((b['commentaire'] ?? '').isNotEmpty)
-                          Text("Commentaire : ${b['commentaire']}",
-                              style: TextStyle(color: Colors.white54)),
-                        if (b['piece'] != null)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4.0),
-                            child: Row(
-                              children: [
-                                Icon(Icons.image,
-                                    color: Colors.greenAccent, size: 18),
-                                SizedBox(width: 4),
-                                Text("Scan disponible",
-                                    style: TextStyle(
-                                        color: Colors.greenAccent,
-                                        fontSize: 13)),
-                              ],
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                                "Date : ${date.day}/${date.month}/${date.year}",
+                                style: TextStyle(color: Colors.white70)),
+                            Text("Fournisseur : ${b['fournisseur'] ?? ""}",
+                                style: TextStyle(color: Colors.white70)),
+                            Text("Catégorie : ${b['categorie'] ?? ""}",
+                                style: TextStyle(color: Colors.white70)),
+                            Text("Quantité : ${b['quantite'] ?? ""}",
+                                style: TextStyle(color: Colors.white70)),
+                            Text(
+                              "Affectation : ${b['affectation'] ?? ""}" +
+                                  ((b['affectation'] == "Sur chantier" &&
+                                          b['chantier_id'] != null)
+                                      ? " (${_libelleChantier(b['chantier_id'])})"
+                                      : ""),
+                              style: TextStyle(color: Colors.white70),
                             ),
-                          ),
-                      ],
-                    ),
-                    onTap: b['piece'] != null
-                        ? () {
-                            showDialog(
-                              context: context,
-                              builder: (_) => Dialog(
-                                backgroundColor: Colors.black,
-                                child: Image.file(File(b['piece'].path)),
+                            if ((b['commentaire'] ?? '').toString().isNotEmpty)
+                              Text("Commentaire : ${b['commentaire']}",
+                                  style: TextStyle(color: Colors.white54)),
+                            if (b['piece'] != null &&
+                                b['piece'].toString().isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 4.0),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.image,
+                                        color: Colors.greenAccent, size: 18),
+                                    SizedBox(width: 4),
+                                    Text("Scan disponible",
+                                        style: TextStyle(
+                                            color: Colors.greenAccent,
+                                            fontSize: 13)),
+                                  ],
+                                ),
                               ),
-                            );
-                          }
-                        : null,
-                  ),
-                );
-              },
-            ),
+                          ],
+                        ),
+                        onTap: (b['piece'] != null &&
+                                b['piece'].toString().isNotEmpty)
+                            ? () {
+                                showDialog(
+                                  context: context,
+                                  builder: (_) => Dialog(
+                                    backgroundColor: Colors.black,
+                                    child: Image.network(
+                                      // Adapte l'URL selon ton API
+                                      'https://fidest.ci/decaissement/uploads/${b['piece']}',
+                                      errorBuilder: (_, __, ___) => Center(
+                                          child: Text("Image non disponible",
+                                              style: TextStyle(
+                                                  color: Colors.white))),
+                                    ),
+                                  ),
+                                );
+                              }
+                            : null,
+                      ),
+                    );
+                  },
+                ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.green,
         child: Icon(Icons.add),
-        onPressed: _ajouterBon,
+        onPressed:
+            (categories.isEmpty || chantiers.isEmpty) ? null : _ajouterBon,
         tooltip: "Ajouter un bon d'entrée",
       ),
     );

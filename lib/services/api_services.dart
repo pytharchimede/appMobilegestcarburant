@@ -791,4 +791,89 @@ class ApiService {
       throw Exception("Erreur lors de l'ajout/modification du stock");
     }
   }
+
+// Récupérer la liste des chantiers
+  Future<List<Map<String, dynamic>>> fetchChantiers() async {
+    final response = await http.get(Uri.parse('$baseUrl?endpoint=chantiers'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des chantiers");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des chantiers");
+    }
+  }
+
+// Récupérer la liste des catégories de bon d'entrée
+  Future<List<String>> fetchBonEntreeCategories() async {
+    final response =
+        await http.get(Uri.parse('$baseUrl?endpoint=bon_entree_categories'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<String>.from(data['data'].map((e) => e['libelle']));
+      } else {
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des catégories");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des catégories");
+    }
+  }
+
+// Récupérer la liste des bons d'entrée
+  Future<List<Map<String, dynamic>>> fetchBonsEntree() async {
+    final response = await http.get(Uri.parse('$baseUrl?endpoint=bons_entree'));
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      if (data['status'] == 'success' && data['data'] != null) {
+        return List<Map<String, dynamic>>.from(data['data']);
+      } else {
+        throw Exception(
+            data['message'] ?? "Erreur lors du chargement des bons");
+      }
+    } else {
+      throw Exception("Erreur lors du chargement des bons");
+    }
+  }
+
+// Ajouter un bon d'entrée (avec pièce jointe)
+  Future<bool> ajouterBonEntree({
+    required String numero,
+    required DateTime date,
+    required String fournisseur,
+    required String categorie,
+    required int quantite,
+    XFile? piece,
+    required String commentaire,
+    required String affectation,
+    int? chantierId,
+  }) async {
+    var uri = Uri.parse('$baseUrl?endpoint=ajouter_bon_entree');
+    var request = http.MultipartRequest('POST', uri);
+    request.fields['numero'] = numero;
+    request.fields['date'] = date.toIso8601String().substring(0, 10);
+    request.fields['fournisseur'] = fournisseur;
+    request.fields['categorie'] = categorie;
+    request.fields['quantite'] = quantite.toString();
+    request.fields['commentaire'] = commentaire;
+    request.fields['affectation'] = affectation;
+    if (chantierId != null)
+      request.fields['chantier_id'] = chantierId.toString();
+    if (piece != null) {
+      request.files.add(await http.MultipartFile.fromPath('piece', piece.path));
+    }
+    var streamedResponse = await request.send();
+    var response = await http.Response.fromStream(streamedResponse);
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return data['status'] == 'success';
+    } else {
+      throw Exception("Erreur lors de l'ajout du bon d'entrée");
+    }
+  }
 }
