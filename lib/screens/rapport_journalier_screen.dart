@@ -109,18 +109,24 @@ class _RapportJournalierScreenState extends State<RapportJournalierScreen> {
             child: Text("Valider"),
             onPressed: () async {
               final key = (_selectedDay ?? _focusedDay).toIso8601String().substring(0, 10);
-              final ok = await apiService.updateRapportJournalier(
-                planningLineId: rapport['planning_line_id'],
-                dateRapport: key,
-                etat: etat,
-                commentaire: commentaireController.text,
-              );
-              if (ok) {
-                Navigator.pop(context);
-                await _loadRapports();
-              } else {
+              try {
+                final ok = await apiService.updateRapportJournalier(
+                  planningLineId: int.parse(rapport['planning_line_id'].toString()),
+                  dateRapport: key,
+                  etat: etat,
+                  commentaire: commentaireController.text,
+                );
+                if (ok) {
+                  Navigator.pop(context);
+                  await _loadRapports();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Erreur lors de la mise à jour")),
+                  );
+                }
+              } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text("Erreur lors de la mise à jour")),
+                  SnackBar(content: Text("Erreur API : $e")),
                 );
               }
             },
