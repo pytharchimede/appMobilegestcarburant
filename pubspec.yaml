@@ -32,6 +32,7 @@ dependencies:
   firebase_messaging: ^14.7.10
   firebase_auth: ^4.17.0 # (si tu veux ajouter l'authentification)
   firebase_analytics: ^10.8.0
+  ota_update: ^4.0.1
 
 # The following dependencies are used for state management and local storage.
 dev_dependencies:

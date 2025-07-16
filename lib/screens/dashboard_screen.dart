@@ -10,6 +10,7 @@ import 'demandes_en_attente_screen.dart'; // en haut du fichier
 import 'parc_auto_screen.dart'; // Importer l'écran ParcAutoScreen
 import '../widgets/logistique_drawer.dart';
 import 'chauffeurs_screen.dart'; // Importer l'écran ChauffeursScreen
+import '../services/update_service.dart'; // Importer le service de mise à jour
 
 class DashboardScreen extends StatefulWidget {
   @override
@@ -174,6 +175,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => ChauffeursScreen()),
+                      );
+                    },
+                  ),
+                  MenuItem(
+                    icon: Icons.system_update,
+                    title: "Mettre à jour l'application",
+                    onTap: () {
+                      UpdateService.startOtaUpdate(
+                          'https://fidest.ci/apkmetier/carbex_latest.apk');
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content: Text(
+                                "Téléchargement de la mise à jour lancé...")),
                       );
                     },
                   ),
