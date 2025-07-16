@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../widgets/solde_widget.dart';
 import '../widgets/station_selection_dialog.dart';
 import '../widgets/graphique_widget.dart';
@@ -23,6 +24,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     soldeFuture = apiService.fetchSolde();
+
+    // Demande la permission (iOS)
+    FirebaseMessaging.instance.requestPermission();
+
+    // Récupère le token FCM (à envoyer à ton serveur si besoin)
+    FirebaseMessaging.instance.getToken().then((token) {
+      print("FCM Token: $token");
+    });
+
+    // Notification reçue en premier plan
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      if (message.notification != null) {
+        // Affiche une snackbar ou un dialog
+        print('Notification reçue: ${message.notification!.title}');
+      }
+    });
+
+    // Notification cliquée (app en arrière-plan)
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      // Navigue ou affiche une page spécifique
+    });
   }
 
   void _onRechargePressed() {

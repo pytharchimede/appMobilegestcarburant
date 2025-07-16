@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "343645363397",
+    "project_id": "erp-banamur",
+    "storage_bucket": "erp-banamur.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:343645363397:android:672bf4ec0ab1e16ceae4ac",
+        "android_client_info": {
+          "package_name": "com.example.gestion_carburant"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDgdn64ix9ZGsvshS2RfgpSCVSDXaks-V0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
