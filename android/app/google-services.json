@@ -2,7 +2,7 @@
   "project_info": {
     "project_number": "343645363397",
     "project_id": "erp-banamur",
-    "storage_bucket": "erp-banamur.firebasestorage.app"
+    "storage_bucket": "erp-banamur.appspot.com"
   },
   "client": [
     {

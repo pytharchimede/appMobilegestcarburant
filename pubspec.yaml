@@ -32,6 +32,7 @@ dependencies:
   firebase_messaging: ^14.7.10
   firebase_auth: ^4.17.0 # (si tu veux ajouter l'authentification)
   firebase_analytics: ^10.8.0
+  google_sign_in: ^6.2.1
 
 # The following dependencies are used for state management and local storage.
 dev_dependencies:
@@ -44,6 +45,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/solde.json
+    - assets/icon/app_icon.png
+    - assets/icon/google.png
 
 # The following section is specific to Flutter Launcher Icons.
 # It generates app icons for both Android and iOS platforms.
@@ -51,3 +54,6 @@ flutter_icons:
   android: true
   ios: true
   image_path: "assets/icon/app_icon.png"
+
+dependency_overrides:
+  open_file_macos: any
