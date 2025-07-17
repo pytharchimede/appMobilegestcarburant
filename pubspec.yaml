@@ -33,6 +33,7 @@ dependencies:
   firebase_auth: ^4.17.0 # (si tu veux ajouter l'authentification)
   firebase_analytics: ^10.8.0
   google_sign_in: ^6.2.1
+  cached_network_image: ^3.3.1
 
 # The following dependencies are used for state management and local storage.
 dev_dependencies:

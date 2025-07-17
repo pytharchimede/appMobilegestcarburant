@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../screens/planning_screen.dart';
 import '../screens/rapport_journalier_screen.dart';
 import '../screens/materiel_screen.dart';
@@ -13,31 +14,97 @@ import '../screens/parametres_screen.dart';
 class LogistiqueDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
     return Drawer(
       backgroundColor: Color(0xFF223C4A),
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          DrawerHeader(
-            decoration: BoxDecoration(
-              color: Color(0xFF17333F),
-            ),
+          Container(
+            color: Color(0xFF17333F),
+            padding: EdgeInsets.symmetric(vertical: 32, horizontal: 16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.business_center,
-                    color: Colors.greenAccent, size: 40),
-                SizedBox(height: 8),
-                Text(
-                  "Gestion Logistique",
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold),
+                // Avatar
+                CircleAvatar(
+                  radius: 38,
+                  backgroundColor: Colors.greenAccent,
+                  backgroundImage: user?.photoURL != null
+                      ? NetworkImage(user!.photoURL!)
+                      : AssetImage('assets/icon/app_icon.png') as ImageProvider,
                 ),
+                SizedBox(height: 12),
+                // Nom
                 Text(
-                  "Version Pro",
-                  style: TextStyle(color: Colors.white54, fontSize: 14),
+                  user?.displayName ?? "Utilisateur",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 4),
+                // Email
+                Text(
+                  user?.email ?? "",
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 16),
+                // Boutons actions
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.greenAccent,
+                        foregroundColor: Color(0xFF17333F),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        textStyle: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.bold),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      icon: Icon(Icons.lock_reset, size: 18),
+                      label: Text("Mot de passe"),
+                      onPressed: () {
+                        _showResetPasswordDialog(context, user?.email);
+                      },
+                    ),
+                    SizedBox(width: 10),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        textStyle: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.bold),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      icon: Icon(Icons.logout, size: 18),
+                      label: Text("Déconnexion"),
+                      onPressed: () async {
+                        await FirebaseAuth.instance.signOut();
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -146,6 +213,43 @@ class LogistiqueDrawer extends StatelessWidget {
       leading: Icon(icon, color: Colors.white),
       title: Text(label, style: TextStyle(color: Colors.white)),
       onTap: onTap,
+    );
+  }
+
+  void _showResetPasswordDialog(BuildContext context, String? email) {
+    final controller = TextEditingController(text: email ?? "");
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text("Réinitialiser le mot de passe"),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(labelText: "Email"),
+        ),
+        actions: [
+          TextButton(
+            child: Text("Annuler"),
+            onPressed: () => Navigator.of(ctx).pop(),
+          ),
+          ElevatedButton(
+            child: Text("Envoyer"),
+            onPressed: () async {
+              try {
+                await FirebaseAuth.instance
+                    .sendPasswordResetEmail(email: controller.text.trim());
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Email de réinitialisation envoyé !")),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("Erreur : $e")),
+                );
+              }
+            },
+          ),
+        ],
+      ),
     );
   }
 }
