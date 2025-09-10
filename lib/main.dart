@@ -5,6 +5,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_analytics/observer.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'firebase_options.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'screens/dashboard_screen.dart';
 import 'screens/login_screen.dart'; // À créer pour le bouton Google
@@ -13,14 +15,23 @@ import 'utils/theme.dart';
 final FirebaseAnalytics analytics = FirebaseAnalytics.instance;
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  // S'assure que Firebase est initialisé avec les bonnes options (web/mobile)
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   // Gère la notification reçue en arrière-plan ici
 }
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  // Important sur le Web: fournir les options de configuration
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  // Ne pas enregistrer le background handler sur le Web (non supporté)
+  if (!kIsWeb) {
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  }
   runApp(GestionCarburantApp());
 }
 

@@ -1,0 +1,35 @@
+# Flutter Web SPA rewrite & MIME types for Apache (mutualisé)
+
+# Activer le moteur de réécriture
+<IfModule mod_rewrite.c>
+  Options -Multiviews
+  RewriteEngine On
+  
+  # Servir les fichiers existants tels quels
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+  
+  # Fallback SPA vers index.html
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# Types utiles pour Flutter Web (CanvasKit/wasm)
+AddType application/wasm .wasm
+AddType application/javascript .mjs
+AddType application/javascript .js
+AddType text/css .css
+AddType application/octet-stream .bin
+AddType application/json .json
+
+# Cache statique basique
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/javascript "access plus 7 days"
+  ExpiresByType application/javascript "access plus 7 days"
+  ExpiresByType text/css "access plus 7 days"
+  ExpiresByType image/png "access plus 30 days"
+  ExpiresByType image/jpeg "access plus 30 days"
+  ExpiresByType image/svg+xml "access plus 30 days"
+  ExpiresByType application/wasm "access plus 7 days"
+</IfModule>
