@@ -1,4 +1,8 @@
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:gestion_carburant/screens/bon_detail_screen.dart';
@@ -14,7 +18,7 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
   final ScrollController _scrollController = ScrollController();
   final NumberFormat formatMontant = NumberFormat("#,##0", "fr_FR");
 
-  // Base URL où sont stockées les images des reçus (à adapter si besoin)
+  // Base URL où sont stockées les images des reçus
   static const String _uploadsBaseUrl =
       'https://fidest.ci/decaissement/uploads/recu_station/';
 
@@ -81,7 +85,7 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
     }
   }
 
-  // Détermine l'état du bon et ses attributs d'affichage (texte, couleur, icône)
+  // Détermine l'état du bon et ses attributs d'affichage
   ({
     String label,
     Color color,
@@ -92,10 +96,9 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
     final desactive = int.tryParse(bon['desactive']?.toString() ?? '0') ?? 0;
     final img = (bon['img_recu_station'] ?? '').toString().trim();
     final hasReceipt = img.isNotEmpty;
+
     String? receiptUrl;
     if (hasReceipt) {
-      // Si le champ contient déjà une URL absolue, on la garde telle quelle
-      // Sinon on préfixe par la base des uploads (dossier recu_station)
       receiptUrl = img.startsWith('http')
           ? img
           : (img.startsWith('recu_station/')
@@ -143,7 +146,33 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
     }
   }
 
-  // Ancien aperçu en Dialog remplacé par l'ouverture navigateur via url_launcher
+  // Aperçu in-app du reçu (avec fallback ouverture navigateur)
+  void _showReceiptDialog(String url) {
+    // Sur le Web, ouvrir directement dans le navigateur pour contourner
+    // les restrictions hotlinking/CORS côté serveur.
+    if (kIsWeb) {
+      _openReceiptUrl(url);
+      return;
+    }
+
+    final cacheBust = DateTime.now().millisecondsSinceEpoch;
+    final urlWithBust =
+        url.contains('?') ? "$url&_=$cacheBust" : "$url?_=$cacheBust";
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: const Color(0xFF17333F),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: _ReceiptPreviewDialogBody(
+            url: urlWithBust,
+            onOpenExternal: () => _openReceiptUrl(url),
+          ),
+        ),
+      ),
+    );
+  }
 
   void _showFiltreDialog() async {
     String? selectedStation = station;
@@ -162,7 +191,6 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
         content: SingleChildScrollView(
           child: Column(
             children: [
-              // Station (à adapter selon ta liste de stations)
               TextField(
                 decoration: InputDecoration(
                   labelText: "Station",
@@ -177,7 +205,6 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                 controller: TextEditingController(text: selectedStation),
               ),
               const SizedBox(height: 12),
-              // Dates
               Row(
                 children: [
                   Expanded(
@@ -242,7 +269,6 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              // Montant min/max
               Row(
                 children: [
                   Expanded(
@@ -432,7 +458,7 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                                 const SizedBox(width: 10),
                                 InkWell(
                                   onTap: () =>
-                                      _openReceiptUrl(status.receiptUrl!),
+                                      _showReceiptDialog(status.receiptUrl!),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: const [
@@ -486,6 +512,153 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                 );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReceiptPreviewDialogBody extends StatefulWidget {
+  final String url;
+  final VoidCallback onOpenExternal;
+  const _ReceiptPreviewDialogBody(
+      {required this.url, required this.onOpenExternal});
+
+  @override
+  State<_ReceiptPreviewDialogBody> createState() =>
+      _ReceiptPreviewDialogBodyState();
+}
+
+class _ReceiptPreviewDialogBodyState extends State<_ReceiptPreviewDialogBody> {
+  Uint8List? _bytes;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!kIsWeb) _fetchBytes();
+  }
+
+  Future<void> _fetchBytes() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final resp = await http.get(
+        Uri.parse(widget.url),
+        headers: {
+          'Referer': 'https://fidest.ci',
+          'User-Agent':
+              'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36',
+          'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+        },
+      );
+      if (resp.statusCode == 200) {
+        _bytes = resp.bodyBytes;
+        _error = null;
+      } else {
+        _error = 'HTTP ${resp.statusCode}';
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget content;
+    if (_bytes != null) {
+      content = InteractiveViewer(
+        child: Image.memory(_bytes!, fit: BoxFit.contain),
+      );
+    } else if (kIsWeb) {
+      content = InteractiveViewer(
+        child: Image.network(
+          widget.url,
+          fit: BoxFit.contain,
+          loadingBuilder: (c, w, p) {
+            if (p == null) return w;
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          },
+          errorBuilder: (c, e, s) => _errorBox(context),
+        ),
+      );
+    } else if (_loading) {
+      content = const Center(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    } else {
+      content = _errorBox(context);
+    }
+
+    return Stack(
+      children: [
+        Positioned.fill(child: content),
+        Positioned(
+          top: 8,
+          right: 8,
+          child: IconButton(
+            icon: const Icon(Icons.close, color: Colors.white70),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _errorBox(BuildContext context) {
+    return Container(
+      color: const Color(0xFF223C4A),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Impossible de charger le reçu',
+            style: TextStyle(color: Colors.white70),
+            textAlign: TextAlign.center,
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
+              textAlign: TextAlign.center,
+            ),
+          ],
+          const SizedBox(height: 12),
+          if (!kIsWeb)
+            ElevatedButton.icon(
+              onPressed: _fetchBytes,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orangeAccent,
+              ),
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              label: const Text('Réessayer',
+                  style: TextStyle(color: Colors.white)),
+            ),
+          const SizedBox(height: 8),
+          ElevatedButton.icon(
+            onPressed: widget.onOpenExternal,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.lightBlueAccent,
+            ),
+            icon: const Icon(Icons.open_in_new, color: Colors.white),
+            label: const Text('Ouvrir dans le navigateur',
+                style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
