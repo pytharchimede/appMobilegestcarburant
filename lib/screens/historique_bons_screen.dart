@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:gestion_carburant/screens/bon_detail_screen.dart';
 import '../services/api_services.dart';
 
@@ -13,6 +14,11 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
   final ScrollController _scrollController = ScrollController();
   final NumberFormat formatMontant = NumberFormat("#,##0", "fr_FR");
 
+  // Base URL où sont stockées les images des reçus (à adapter si besoin)
+  static const String _uploadsBaseUrl =
+      'https://fidest.ci/decaissement/uploads/recu_station/';
+
+  // Données et pagination
   List<Map<String, dynamic>> bons = [];
   bool isLoading = false;
   bool hasMore = true;
@@ -61,19 +67,83 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
         montantMax: montantMax,
       );
       setState(() {
-        bons.addAll(result['bons']);
-        montantTotal = result['montantTotal'];
-        hasMore = result['hasMore'];
+        bons.addAll(List<Map<String, dynamic>>.from(result['bons']));
+        montantTotal = (result['montantTotal'] ?? 0.0).toDouble();
+        hasMore = result['hasMore'] == true;
         page++;
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Erreur de chargement")),
+        const SnackBar(content: Text("Erreur de chargement")),
       );
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
+
+  // Détermine l'état du bon et ses attributs d'affichage (texte, couleur, icône)
+  ({
+    String label,
+    Color color,
+    IconData icon,
+    bool hasReceipt,
+    String? receiptUrl
+  }) _resolveBonStatus(Map<String, dynamic> bon) {
+    final desactive = int.tryParse(bon['desactive']?.toString() ?? '0') ?? 0;
+    final img = (bon['img_recu_station'] ?? '').toString().trim();
+    final hasReceipt = img.isNotEmpty;
+    String? receiptUrl;
+    if (hasReceipt) {
+      // Si le champ contient déjà une URL absolue, on la garde telle quelle
+      // Sinon on préfixe par la base des uploads (dossier recu_station)
+      receiptUrl = img.startsWith('http')
+          ? img
+          : (img.startsWith('recu_station/')
+              ? 'https://fidest.ci/decaissement/uploads/' + img
+              : _uploadsBaseUrl + img);
+    }
+
+    if (desactive == 1) {
+      return (
+        label: 'Annulé',
+        color: Colors.redAccent,
+        icon: Icons.cancel,
+        hasReceipt: false,
+        receiptUrl: null,
+      );
+    }
+
+    if (hasReceipt) {
+      return (
+        label: 'Déjà servi',
+        color: Colors.green,
+        icon: Icons.check_circle,
+        hasReceipt: true,
+        receiptUrl: receiptUrl,
+      );
+    }
+
+    return (
+      label: 'En attente de service',
+      color: Colors.amber,
+      icon: Icons.schedule,
+      hasReceipt: false,
+      receiptUrl: null,
+    );
+  }
+
+  Future<void> _openReceiptUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.platformDefault)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Impossible d'ouvrir le reçu")),
+        );
+      }
+    }
+  }
+
+  // Ancien aperçu en Dialog remplacé par l'ouverture navigateur via url_launcher
 
   void _showFiltreDialog() async {
     String? selectedStation = station;
@@ -85,9 +155,9 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Color(0xFF17333F),
+        backgroundColor: const Color(0xFF17333F),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text("Filtres",
+        title: const Text("Filtres",
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         content: SingleChildScrollView(
           child: Column(
@@ -96,17 +166,17 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
               TextField(
                 decoration: InputDecoration(
                   labelText: "Station",
-                  labelStyle: TextStyle(color: Colors.white70),
+                  labelStyle: const TextStyle(color: Colors.white70),
                   filled: true,
-                  fillColor: Color(0xFF223C4A),
+                  fillColor: const Color(0xFF223C4A),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
-                style: TextStyle(color: Colors.white),
+                style: const TextStyle(color: Colors.white),
                 onChanged: (v) => selectedStation = v,
                 controller: TextEditingController(text: selectedStation),
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               // Dates
               Row(
                 children: [
@@ -119,26 +189,27 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                           firstDate: DateTime(2020),
                           lastDate: DateTime.now(),
                         );
-                        if (picked != null)
+                        if (picked != null) {
                           setState(() => selectedDebut = picked);
+                        }
                       },
                       child: Container(
-                        padding:
-                            EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 12, horizontal: 8),
                         decoration: BoxDecoration(
-                          color: Color(0xFF223C4A),
+                          color: const Color(0xFF223C4A),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           selectedDebut != null
                               ? DateFormat('dd/MM/yyyy').format(selectedDebut!)
                               : "Date début",
-                          style: TextStyle(color: Colors.white70),
+                          style: const TextStyle(color: Colors.white70),
                         ),
                       ),
                     ),
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: InkWell(
                       onTap: () async {
@@ -148,40 +219,41 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                           firstDate: DateTime(2020),
                           lastDate: DateTime.now(),
                         );
-                        if (picked != null)
+                        if (picked != null) {
                           setState(() => selectedFin = picked);
+                        }
                       },
                       child: Container(
-                        padding:
-                            EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 12, horizontal: 8),
                         decoration: BoxDecoration(
-                          color: Color(0xFF223C4A),
+                          color: const Color(0xFF223C4A),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           selectedFin != null
                               ? DateFormat('dd/MM/yyyy').format(selectedFin!)
                               : "Date fin",
-                          style: TextStyle(color: Colors.white70),
+                          style: const TextStyle(color: Colors.white70),
                         ),
                       ),
                     ),
                   ),
                 ],
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               // Montant min/max
               Row(
                 children: [
                   Expanded(
                     child: TextField(
                       keyboardType: TextInputType.number,
-                      style: TextStyle(color: Colors.white),
+                      style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: "Montant min",
-                        labelStyle: TextStyle(color: Colors.white70),
+                        labelStyle: const TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF223C4A),
+                        fillColor: const Color(0xFF223C4A),
                         border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12)),
                       ),
@@ -190,16 +262,16 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                           text: selectedMin?.toString() ?? ''),
                     ),
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: TextField(
                       keyboardType: TextInputType.number,
-                      style: TextStyle(color: Colors.white),
+                      style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: "Montant max",
-                        labelStyle: TextStyle(color: Colors.white70),
+                        labelStyle: const TextStyle(color: Colors.white70),
                         filled: true,
-                        fillColor: Color(0xFF223C4A),
+                        fillColor: const Color(0xFF223C4A),
                         border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12)),
                       ),
@@ -226,11 +298,13 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
               Navigator.pop(context);
               _loadBons(reset: true);
             },
-            child: Text("Appliquer", style: TextStyle(color: Colors.white)),
+            child:
+                const Text("Appliquer", style: TextStyle(color: Colors.white)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text("Annuler", style: TextStyle(color: Colors.white54)),
+            child:
+                const Text("Annuler", style: TextStyle(color: Colors.white54)),
           ),
         ],
       ),
@@ -240,13 +314,13 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF17333F),
+      backgroundColor: const Color(0xFF17333F),
       appBar: AppBar(
-        title: Text("Historique des bons"),
-        backgroundColor: Color(0xFF17333F),
+        title: const Text("Historique des bons"),
+        backgroundColor: const Color(0xFF17333F),
         actions: [
           IconButton(
-            icon: Icon(Icons.filter_alt, color: Colors.white),
+            icon: const Icon(Icons.filter_alt, color: Colors.white),
             onPressed: _showFiltreDialog,
           ),
         ],
@@ -254,19 +328,20 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
       body: Column(
         children: [
           Container(
-            margin: EdgeInsets.all(16),
-            padding: EdgeInsets.all(16),
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Color(0xFF223C4A),
+              color: const Color(0xFF223C4A),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("Montant total", style: TextStyle(color: Colors.white70)),
+                const Text("Montant total",
+                    style: TextStyle(color: Colors.white70)),
                 Text(
                   "${formatMontant.format(montantTotal)} XOF",
-                  style: TextStyle(
+                  style: const TextStyle(
                       color: Colors.greenAccent,
                       fontWeight: FontWeight.bold,
                       fontSize: 20),
@@ -280,31 +355,46 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
               itemCount: bons.length + (hasMore ? 1 : 0),
               itemBuilder: (context, index) {
                 if (index >= bons.length) {
-                  return Center(
+                  return const Center(
                       child: Padding(
                     padding: EdgeInsets.all(16),
                     child: CircularProgressIndicator(),
                   ));
                 }
                 final bon = bons[index];
-                double montant =
-                    double.tryParse(bon['montant'].toString()) ?? 0;
+                final status = _resolveBonStatus(bon);
                 return Card(
-                  color: Color(0xFF223C4A),
-                  margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  color: const Color(0xFF223C4A),
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: ListTile(
-                    leading: Icon(Icons.receipt, color: Colors.white),
+                    leading: Stack(
+                      alignment: Alignment.bottomRight,
+                      children: [
+                        const Icon(Icons.receipt, color: Colors.white),
+                        Container(
+                          margin: const EdgeInsets.only(top: 18),
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: status.color.withOpacity(0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child:
+                              Icon(status.icon, size: 14, color: status.color),
+                        ),
+                      ],
+                    ),
                     title: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
                           bon['code_bon']?.toString() ?? '',
-                          style: TextStyle(
+                          style: const TextStyle(
                               color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                         Text(
                           "${formatMontant.format(double.tryParse(bon['montant'].toString()) ?? 0)} XOF",
-                          style: TextStyle(
+                          style: const TextStyle(
                               color: Colors.greenAccent,
                               fontWeight: FontWeight.bold),
                         ),
@@ -313,33 +403,76 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
                           bon['motif']?.toString() ?? '',
-                          style: TextStyle(color: Colors.white70),
+                          style: const TextStyle(color: Colors.white70),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 6),
+                        // Badge d'état avec action Voir reçu
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: status.color.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color: status.color.withOpacity(0.4)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(status.icon, size: 14, color: status.color),
+                              const SizedBox(width: 6),
+                              Text(status.label,
+                                  style: TextStyle(
+                                      color: status.color,
+                                      fontWeight: FontWeight.w600)),
+                              if (status.hasReceipt) ...[
+                                const SizedBox(width: 10),
+                                InkWell(
+                                  onTap: () =>
+                                      _openReceiptUrl(status.receiptUrl!),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: const [
+                                      Icon(Icons.image,
+                                          size: 14,
+                                          color: Colors.lightBlueAccent),
+                                      SizedBox(width: 4),
+                                      Text('Voir reçu',
+                                          style: TextStyle(
+                                              color: Colors.lightBlueAccent)),
+                                    ],
+                                  ),
+                                ),
+                              ]
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 6),
                         Row(
                           children: [
-                            Icon(Icons.person, color: Colors.white54, size: 16),
-                            SizedBox(width: 4),
+                            const Icon(Icons.person,
+                                color: Colors.white54, size: 16),
+                            const SizedBox(width: 4),
                             Text(
                               bon['nom_beneficiaire']?.toString() ?? '',
-                              style: TextStyle(color: Colors.white54),
+                              style: const TextStyle(color: Colors.white54),
                             ),
-                            Spacer(),
-                            Icon(Icons.calendar_today,
+                            const Spacer(),
+                            const Icon(Icons.calendar_today,
                                 color: Colors.white54, size: 14),
-                            SizedBox(width: 4),
+                            const SizedBox(width: 4),
                             Text(
                               bon['date_demande']?.toString() ?? '',
-                              style: TextStyle(color: Colors.white54),
+                              style: const TextStyle(color: Colors.white54),
                             ),
                           ],
                         ),
                       ],
                     ),
-                    trailing: Icon(Icons.arrow_forward_ios,
+                    trailing: const Icon(Icons.arrow_forward_ios,
                         color: Colors.white54, size: 16),
                     onTap: () {
                       Navigator.push(
