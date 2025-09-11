@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:intl/intl.dart';
+import 'dart:math' as math;
 import '../services/api_services.dart';
 
 class SoldeEvolutionWidget extends StatefulWidget {
@@ -65,6 +67,68 @@ class _SoldeEvolutionWidgetState extends State<SoldeEvolutionWidget> {
       );
     }
 
+    // Préparer deux séries positives superposées à partir des données API
+    final List<Map<String, dynamic>> dataTriee = [...donnees];
+    dataTriee.sort((a, b) {
+      final da = a['date'];
+      final db = b['date'];
+      if (da is String && db is String) {
+        return da.compareTo(db);
+      }
+      final ja = (a['jour'] ?? 0) as num;
+      final jb = (b['jour'] ?? 0) as num;
+      return ja.compareTo(jb);
+    });
+
+    double safeNum(dynamic v) => (v is num) ? v.toDouble() : 0.0;
+
+    final List<String> labels = [];
+    final List<FlSpot> rechargementsSpots = [];
+    final List<FlSpot> demandesSpots = [];
+    for (int i = 0; i < dataTriee.length; i++) {
+      final p = dataTriee[i];
+      final dateStr = (p['date'] ?? '').toString();
+      String label;
+      if (dateStr.isNotEmpty && dateStr.length >= 10) {
+        label = '${dateStr.substring(8, 10)}/${dateStr.substring(5, 7)}';
+      } else {
+        label = 'J${((p['jour'] ?? (i + 1)) as num).toInt()}';
+      }
+      labels.add(label);
+
+      final x = i.toDouble();
+      final recharge = p.containsKey('rechargement')
+          ? safeNum(p['rechargement'])
+          : safeNum(p['entree']).abs();
+      final demandeServie = p.containsKey('sortie_servie')
+          ? safeNum(p['sortie_servie'])
+          : safeNum(p['sortie']).abs();
+      rechargementsSpots.add(FlSpot(x, recharge));
+      demandesSpots.add(FlSpot(x, demandeServie));
+    }
+
+    double seriesMax(List<FlSpot> s) =>
+        s.isEmpty ? 0 : s.map((e) => e.y).reduce(math.max);
+    double niceStep(double maxVal) {
+      if (maxVal <= 0) return 1;
+      final raw = maxVal / 4; // ~4 graduations
+      final pow10 = (math.log(raw) / math.log(10)).floor();
+      final base = math.pow(10, pow10).toDouble();
+      final candidates = [1 * base, 2 * base, 5 * base, 10 * base];
+      double best = candidates.first;
+      for (final c in candidates) {
+        if ((raw - c).abs() < (raw - best).abs()) best = c;
+      }
+      return best;
+    }
+
+    final maxVal =
+        math.max(seriesMax(rechargementsSpots), seriesMax(demandesSpots));
+    final pad = maxVal * 0.1;
+    final maxY = maxVal + pad;
+    final yInterval = niceStep(maxY);
+    final numberFmt = NumberFormat.compact(locale: 'fr_FR');
+
     return Card(
       color: Color(0xFF17333F),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -73,10 +137,11 @@ class _SoldeEvolutionWidgetState extends State<SoldeEvolutionWidget> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Évolution du solde", style: TextStyle(color: Colors.white70)),
+            Text('Rechargements vs Demandes servies',
+                style: TextStyle(color: Colors.white70)),
             SizedBox(height: 10),
             Container(
-              height: 150,
+              height: 220,
               child: LineChart(
                 LineChartData(
                   backgroundColor: Colors.transparent,
@@ -85,32 +150,32 @@ class _SoldeEvolutionWidgetState extends State<SoldeEvolutionWidget> {
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: 22,
-                        interval: 5,
+                        reservedSize: 26,
+                        interval: 1,
                         getTitlesWidget: (value, meta) {
-                          if (value % 5 == 0 || value == 1 || value == 30) {
-                            return Text(
-                              "${value.toInt()}j",
-                              style: TextStyle(
-                                  color: Colors.white54, fontSize: 10),
-                            );
+                          final idx = value.round();
+                          // Afficher ~6 labels max
+                          final step = (labels.length / 6).ceil().clamp(1, 10);
+                          if (idx % step == 0 &&
+                              idx >= 0 &&
+                              idx < labels.length) {
+                            return Text(labels[idx],
+                                style: const TextStyle(
+                                    color: Colors.white54, fontSize: 10));
                           }
-                          return Container();
+                          return const SizedBox.shrink();
                         },
                       ),
                     ),
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: 35,
-                        interval: 50000,
-                        getTitlesWidget: (value, meta) {
-                          return Text(
-                            "${(value / 1000).toInt()}k",
-                            style:
-                                TextStyle(color: Colors.white54, fontSize: 10),
-                          );
-                        },
+                        reservedSize: 40,
+                        interval: yInterval,
+                        getTitlesWidget: (value, meta) => Text(
+                            numberFmt.format(value),
+                            style: const TextStyle(
+                                color: Colors.white54, fontSize: 10)),
                       ),
                     ),
                     topTitles:
@@ -120,63 +185,37 @@ class _SoldeEvolutionWidgetState extends State<SoldeEvolutionWidget> {
                   ),
                   borderData: FlBorderData(show: false),
                   lineBarsData: [
-                    // Solde (ligne principale)
                     LineChartBarData(
                       isCurved: true,
-                      color: Color(0xFF00A9A5),
+                      color: Colors.greenAccent,
                       barWidth: 3,
                       belowBarData: BarAreaData(
-                        show: true,
-                        color: Color(0xFF00A9A5).withOpacity(0.2),
-                      ),
-                      spots: donnees
-                          .map((point) => FlSpot(
-                              (point['jour'] as num).toDouble(),
-                              (point['solde'] as num).toDouble()))
-                          .toList(),
+                          show: true,
+                          color: Colors.greenAccent.withOpacity(0.12)),
+                      spots: rechargementsSpots,
                     ),
-                    // Entrées (optionnel, en pointillés)
                     LineChartBarData(
-                      isCurved: false,
-                      color: Colors.greenAccent,
-                      barWidth: 1,
-                      isStrokeCapRound: true,
-                      dashArray: [5, 5],
-                      spots: donnees
-                          .map((point) => FlSpot(
-                              (point['jour'] as num).toDouble(),
-                              (point['entree'] as num).toDouble()))
-                          .toList(),
-                    ),
-                    // Sorties (optionnel, en pointillés)
-                    LineChartBarData(
-                      isCurved: false,
+                      isCurved: true,
                       color: Colors.redAccent,
-                      barWidth: 1,
-                      isStrokeCapRound: true,
-                      dashArray: [5, 5],
-                      spots: donnees
-                          .map((point) => FlSpot(
-                              (point['jour'] as num).toDouble(),
-                              (point['sortie'] as num).toDouble()))
-                          .toList(),
+                      barWidth: 3,
+                      belowBarData: BarAreaData(
+                          show: true,
+                          color: Colors.redAccent.withOpacity(0.10)),
+                      spots: demandesSpots,
                     ),
                   ],
                 ),
               ),
             ),
+            const SizedBox(height: 8),
             Row(
               children: [
-                Icon(Icons.show_chart, color: Color(0xFF00A9A5), size: 16),
-                Text(" Solde",
-                    style: TextStyle(color: Colors.white54, fontSize: 12)),
-                SizedBox(width: 12),
                 Icon(Icons.show_chart, color: Colors.greenAccent, size: 16),
-                Text(" Entrées",
+                Text(' Rechargements',
                     style: TextStyle(color: Colors.white54, fontSize: 12)),
                 SizedBox(width: 12),
                 Icon(Icons.show_chart, color: Colors.redAccent, size: 16),
-                Text(" Sorties",
+                Text(' Demandes servies',
                     style: TextStyle(color: Colors.white54, fontSize: 12)),
               ],
             ),
