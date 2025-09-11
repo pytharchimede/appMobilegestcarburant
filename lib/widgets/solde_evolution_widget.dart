@@ -85,6 +85,8 @@ class _SoldeEvolutionWidgetState extends State<SoldeEvolutionWidget> {
     final List<String> labels = [];
     final List<FlSpot> rechargementsSpots = [];
     final List<FlSpot> demandesSpots = [];
+    final List<FlSpot> soldeSpots = [];
+    double cumul = 0.0;
     for (int i = 0; i < dataTriee.length; i++) {
       final p = dataTriee[i];
       final dateStr = (p['date'] ?? '').toString();
@@ -105,6 +107,11 @@ class _SoldeEvolutionWidgetState extends State<SoldeEvolutionWidget> {
           : safeNum(p['sortie']).abs();
       rechargementsSpots.add(FlSpot(x, recharge));
       demandesSpots.add(FlSpot(x, demandeServie));
+      // Solde évolutif (API si fourni, sinon cumul local)
+      final double soldeVal = p.containsKey('solde_evolutif')
+          ? safeNum(p['solde_evolutif'])
+          : (cumul += recharge - demandeServie);
+      soldeSpots.add(FlSpot(x, soldeVal));
     }
 
     double seriesMax(List<FlSpot> s) =>
@@ -122,8 +129,11 @@ class _SoldeEvolutionWidgetState extends State<SoldeEvolutionWidget> {
       return best;
     }
 
-    final maxVal =
-        math.max(seriesMax(rechargementsSpots), seriesMax(demandesSpots));
+    final maxVal = [
+      seriesMax(rechargementsSpots),
+      seriesMax(demandesSpots),
+      seriesMax(soldeSpots),
+    ].reduce(math.max);
     final pad = maxVal * 0.1;
     final maxY = maxVal + pad;
     final yInterval = niceStep(maxY);
@@ -137,7 +147,7 @@ class _SoldeEvolutionWidgetState extends State<SoldeEvolutionWidget> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Rechargements vs Demandes servies',
+            Text('Rechargements, Demandes servies et Solde évolutif',
                 style: TextStyle(color: Colors.white70)),
             SizedBox(height: 10),
             Container(
@@ -203,6 +213,15 @@ class _SoldeEvolutionWidgetState extends State<SoldeEvolutionWidget> {
                           color: Colors.redAccent.withOpacity(0.10)),
                       spots: demandesSpots,
                     ),
+                    LineChartBarData(
+                      isCurved: true,
+                      color: Color(0xFF00A9A5),
+                      barWidth: 3,
+                      belowBarData: BarAreaData(
+                          show: true,
+                          color: const Color(0xFF00A9A5).withOpacity(0.10)),
+                      spots: soldeSpots,
+                    ),
                   ],
                 ),
               ),
@@ -216,6 +235,10 @@ class _SoldeEvolutionWidgetState extends State<SoldeEvolutionWidget> {
                 SizedBox(width: 12),
                 Icon(Icons.show_chart, color: Colors.redAccent, size: 16),
                 Text(' Demandes servies',
+                    style: TextStyle(color: Colors.white54, fontSize: 12)),
+                SizedBox(width: 12),
+                Icon(Icons.show_chart, color: Color(0xFF00A9A5), size: 16),
+                Text(' Solde évolutif',
                     style: TextStyle(color: Colors.white54, fontSize: 12)),
               ],
             ),
