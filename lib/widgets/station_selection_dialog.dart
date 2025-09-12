@@ -156,13 +156,16 @@ class _StationSelectionDialogState extends State<StationSelectionDialog> {
                           ),
                           onPressed: () async {
                             final img = await _picker.pickImage(
-                                source: ImageSource.gallery, imageQuality: 85);
+                              source: ImageSource.camera,
+                              imageQuality: 85,
+                              preferredCameraDevice: CameraDevice.rear,
+                            );
                             if (img != null) {
                               setState(() => _recuImage = img);
                             }
                           },
-                          icon: const Icon(Icons.attach_file),
-                          label: const Text('Joindre une image'),
+                          icon: const Icon(Icons.camera_alt),
+                          label: const Text('Prendre une photo'),
                         ),
                         const SizedBox(width: 12),
                         if (_recuImage != null)
