@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:http_parser/http_parser.dart';
@@ -146,29 +147,51 @@ class ApiService {
 
     try {
       if (recuImage != null) {
-        // Envoi multipart avec fichier
+        // Sur le web, on évite totalement multipart (non supporté) -> base64
+        if (kIsWeb) {
+          final bytes = await recuImage.readAsBytes();
+          final mt = _guessMediaType(recuImage.path);
+          final mime = '${mt.type}/${mt.subtype}';
+          final b64 = base64Encode(bytes);
+          final dataUrl = 'data:$mime;base64,$b64';
+          final resp = await http.post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'telephone': telephone,
+              'nom': nom,
+              'montant': montant,
+              'img_recu_base64': dataUrl,
+            }),
+          );
+          Map<String, dynamic>? d;
+          try {
+            d = json.decode(resp.body);
+          } catch (_) {}
+          if (resp.statusCode == 200 &&
+              (d != null ? d['status'] == 'success' : false)) {
+            return {
+              'ok': true,
+              'status': d['status'],
+              'message': d['message'] ?? 'Rechargement enregistré',
+              'img_recu': d['img_recu'],
+            };
+          }
+          return {
+            'ok': false,
+            'status': d != null ? (d['status'] ?? 'http_error') : 'http_error',
+            'message': d != null
+                ? (d['message'] ?? d['error'] ?? 'HTTP ${resp.statusCode}')
+                : 'HTTP ${resp.statusCode}: ${resp.body}',
+          };
+        }
+
+        // 1) Essai multipart avec fichier
         final request = http.MultipartRequest('POST', uri)
           ..fields['telephone'] = telephone
           ..fields['nom'] = nom
           ..fields['montant'] = montant.toString();
-
-        // Déterminer le content-type à partir de l’extension
-        MediaType _guessMediaType(String path) {
-          final ext = path.split('.').last.toLowerCase();
-          switch (ext) {
-            case 'jpg':
-            case 'jpeg':
-              return MediaType('image', 'jpeg');
-            case 'png':
-              return MediaType('image', 'png');
-            case 'webp':
-              return MediaType('image', 'webp');
-            case 'gif':
-              return MediaType('image', 'gif');
-            default:
-              return MediaType('application', 'octet-stream');
-          }
-        }
+        request.headers['Accept'] = 'application/json';
 
         request.files.add(await http.MultipartFile.fromPath(
           'img_recu',
@@ -179,19 +202,68 @@ class ApiService {
 
         final streamed = await request.send();
         final response = await http.Response.fromStream(streamed);
-        final data = json.decode(response.body);
-        if (response.statusCode == 200) {
+        Map<String, dynamic>? data;
+        try {
+          data = json.decode(response.body);
+        } catch (_) {}
+        final okMultipart = response.statusCode == 200 &&
+            (data != null ? data['status'] == 'success' : false);
+        if (okMultipart) {
           return {
-            'ok': data['status'] == 'success',
+            'ok': true,
             'status': data['status'],
-            'message': data['message'],
+            'message': data['message'] ?? 'Rechargement enregistré',
             'img_recu': data['img_recu'],
           };
         }
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+
+        // 2) Fallback JSON base64 si multipart échoue
+        try {
+          final bytes = await recuImage.readAsBytes();
+          final mt = _guessMediaType(recuImage.path);
+          final mime = '${mt.type}/${mt.subtype}';
+          final b64 = base64Encode(bytes);
+          final dataUrl = 'data:$mime;base64,$b64';
+          final resp = await http.post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'telephone': telephone,
+              'nom': nom,
+              'montant': montant,
+              'img_recu_base64': dataUrl,
+            }),
+          );
+          Map<String, dynamic>? d;
+          try {
+            d = json.decode(resp.body);
+          } catch (_) {}
+          if (resp.statusCode == 200 &&
+              (d != null ? d['status'] == 'success' : false)) {
+            return {
+              'ok': true,
+              'status': d['status'],
+              'message': d['message'] ?? 'Rechargement enregistré',
+              'img_recu': d['img_recu'],
+            };
+          }
+          return {
+            'ok': false,
+            'status': d != null ? (d['status'] ?? 'http_error') : 'http_error',
+            'message': d != null
+                ? (d['message'] ?? d['error'] ?? 'HTTP ${resp.statusCode}')
+                : 'HTTP ${resp.statusCode}: ${resp.body}',
+          };
+        } catch (e) {
+          return {
+            'ok': false,
+            'status': 'exception',
+            'message': e.toString(),
+          };
+        }
       }
 
-      // Fallback JSON (optionnellement avec base64)
+      // 3) Chemin JSON simple (avec ou sans base64 fourni)
       String? dataUrl;
       if (recuBytes != null && recuMimeType != null) {
         final b64 = base64Encode(recuBytes);
@@ -207,18 +279,51 @@ class ApiService {
           if (dataUrl != null) 'img_recu_base64': dataUrl,
         }),
       );
-      final data = json.decode(resp.body);
+      Map<String, dynamic>? data;
+      try {
+        data = json.decode(resp.body);
+      } catch (_) {}
       if (resp.statusCode == 200) {
         return {
-          'ok': data['status'] == 'success',
-          'status': data['status'],
-          'message': data['message'],
-          'img_recu': data['img_recu'],
+          'ok': data != null ? (data['status'] == 'success') : false,
+          'status': data != null ? (data['status'] ?? 'error') : 'error',
+          'message': data != null
+              ? (data['message'] ?? data['error'] ?? 'Réponse invalide')
+              : 'Réponse invalide',
+          'img_recu': data != null ? data['img_recu'] : null,
         };
       }
-      throw Exception('HTTP ${resp.statusCode}: ${resp.body}');
+      return {
+        'ok': false,
+        'status':
+            data != null ? (data['status'] ?? 'http_error') : 'http_error',
+        'message': data != null
+            ? (data['message'] ?? data['error'] ?? 'HTTP ${resp.statusCode}')
+            : 'HTTP ${resp.statusCode}: ${resp.body}',
+      };
     } catch (e) {
-      rethrow;
+      return {
+        'ok': false,
+        'status': 'exception',
+        'message': e.toString(),
+      };
+    }
+  }
+
+  MediaType _guessMediaType(String path) {
+    final ext = path.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return MediaType('image', 'jpeg');
+      case 'png':
+        return MediaType('image', 'png');
+      case 'webp':
+        return MediaType('image', 'webp');
+      case 'gif':
+        return MediaType('image', 'gif');
+      default:
+        return MediaType('application', 'octet-stream');
     }
   }
 
@@ -233,7 +338,7 @@ class ApiService {
     double? montantMin,
     double? montantMax,
   }) async {
-    final Map<String, dynamic> params = {
+    final Map<String, String> params = {
       'endpoint': 'historique_bons',
       'page': page.toString(),
       if (station != null && station.isNotEmpty) 'station': station,
@@ -246,12 +351,7 @@ class ApiService {
     };
 
     final uri = Uri.parse(baseUrl).replace(queryParameters: params);
-
-    print('URL appelée : $uri');
-
     final response = await http.get(uri);
-    print('Réponse brute historique_bons: ${response.body}'); // Ajoute ceci
-
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       if (data['status'] == 'success' && data['data'] != null) {

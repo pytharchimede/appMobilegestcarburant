@@ -155,13 +155,26 @@ class _StationSelectionDialogState extends State<StationSelectionDialog> {
                             foregroundColor: Colors.white,
                           ),
                           onPressed: () async {
-                            final img = await _picker.pickImage(
-                              source: ImageSource.camera,
-                              imageQuality: 85,
-                              preferredCameraDevice: CameraDevice.rear,
-                            );
-                            if (img != null) {
-                              setState(() => _recuImage = img);
+                            try {
+                              final img = await _picker.pickImage(
+                                source: ImageSource.camera,
+                                imageQuality: 85,
+                                maxWidth: 1600,
+                                maxHeight: 1600,
+                                preferredCameraDevice: CameraDevice.rear,
+                              );
+                              if (img != null) {
+                                setState(() => _recuImage = img);
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                        'Impossible d\'ouvrir la caméra. Vérifiez les permissions.'),
+                                  ),
+                                );
+                              }
                             }
                           },
                           icon: const Icon(Icons.camera_alt),
