@@ -51,15 +51,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     showDialog(
       context: context,
       builder: (_) => StationSelectionDialog(
-        onValider: (telephone, nomGerant, montant) async {
+        onValider: (telephone, nomGerant, montant, recuImage) async {
           try {
-            bool success = await apiService.rechargerStation(
+            final result = await apiService.rechargerStationAvecRecu(
               telephone: telephone,
               nom: nomGerant,
               montant: montant,
+              recuImage: recuImage,
             );
             Navigator.pop(context); // Ferme la boîte de dialogue ici SEULEMENT
-            if (success) {
+            if (result['ok'] == true) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text("Rechargement effectué avec succès !")),
               );
@@ -68,7 +69,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               });
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text("Échec du rechargement")),
+                SnackBar(
+                    content: Text(result['message']?.toString() ??
+                        "Échec du rechargement")),
               );
             }
           } catch (e) {

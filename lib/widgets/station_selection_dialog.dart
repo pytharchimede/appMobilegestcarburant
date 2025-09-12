@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import '../services/api_services.dart';
 
 class StationSelectionDialog extends StatefulWidget {
-  final void Function(String telephone, String nomGerant, double montant)? onValider;
+  final void Function(
+          String telephone, String nomGerant, double montant, XFile? recuImage)?
+      onValider;
 
   StationSelectionDialog({this.onValider});
 
@@ -19,6 +22,8 @@ class _StationSelectionDialogState extends State<StationSelectionDialog> {
   String? error;
   final TextEditingController montantController = TextEditingController();
   String? montantError;
+  XFile? _recuImage;
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -87,7 +92,8 @@ class _StationSelectionDialogState extends State<StationSelectionDialog> {
                     if (selectedStation != null) ...[
                       Text(
                         "Nom station : ${selectedStation!['nom_station']}",
-                        style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            color: Colors.white70, fontWeight: FontWeight.bold),
                       ),
                       Text(
                         "Nom gérant : ${selectedStation!['nom_gerant']}",
@@ -125,13 +131,66 @@ class _StationSelectionDialogState extends State<StationSelectionDialog> {
                             ),
                           ),
                         ),
-                        errorText: montantController.text.isNotEmpty && (montant == null || montant < 5000)
+                        errorText: montantController.text.isNotEmpty &&
+                                (montant == null || montant < 5000)
                             ? "Montant minimum autorisé : 5000 XOF"
                             : null,
                       ),
                       onChanged: (value) {
                         setState(() {});
                       },
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Reçu du rechargement (optionnel)',
+                      style: TextStyle(
+                          color: Colors.white70, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF00A9A5),
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () async {
+                            final img = await _picker.pickImage(
+                                source: ImageSource.gallery, imageQuality: 85);
+                            if (img != null) {
+                              setState(() => _recuImage = img);
+                            }
+                          },
+                          icon: const Icon(Icons.attach_file),
+                          label: const Text('Joindre une image'),
+                        ),
+                        const SizedBox(width: 12),
+                        if (_recuImage != null)
+                          Expanded(
+                            child: Row(
+                              children: [
+                                const Icon(Icons.check_circle,
+                                    color: Colors.lightGreenAccent),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    _recuImage!.name,
+                                    style:
+                                        const TextStyle(color: Colors.white70),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                IconButton(
+                                  tooltip: 'Retirer',
+                                  icon: const Icon(Icons.close,
+                                      color: Colors.white54),
+                                  onPressed: () =>
+                                      setState(() => _recuImage = null),
+                                )
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -140,7 +199,8 @@ class _StationSelectionDialogState extends State<StationSelectionDialog> {
           style: TextButton.styleFrom(
             foregroundColor: Colors.white,
             backgroundColor: Color(0xFF00A9A5),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           ),
           onPressed: (selectedStation == null ||
@@ -154,10 +214,12 @@ class _StationSelectionDialogState extends State<StationSelectionDialog> {
                       selectedStation!['telephone_gerant'],
                       selectedStation!['nom_gerant'],
                       montant,
+                      _recuImage,
                     );
                   }
                 },
-          child: Text('Valider', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          child: Text('Valider',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         ),
         TextButton(
           onPressed: () => Navigator.pop(context),

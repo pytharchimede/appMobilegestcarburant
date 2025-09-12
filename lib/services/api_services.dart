@@ -131,6 +131,97 @@ class ApiService {
     }
   }
 
+  /// Enregistre un rechargement avec reçu (image) si fourni.
+  /// Préfère multipart/form-data avec champ fichier 'img_recu'.
+  /// Fallback JSON avec image base64 si [recuBytes] et [recuMimeType] sont fournis.
+  Future<Map<String, dynamic>> rechargerStationAvecRecu({
+    required String telephone,
+    required String nom,
+    required double montant,
+    XFile? recuImage,
+    List<int>? recuBytes,
+    String? recuMimeType,
+  }) async {
+    final uri = Uri.parse('$baseUrl?endpoint=confirmation_carburant');
+
+    try {
+      if (recuImage != null) {
+        // Envoi multipart avec fichier
+        final request = http.MultipartRequest('POST', uri)
+          ..fields['telephone'] = telephone
+          ..fields['nom'] = nom
+          ..fields['montant'] = montant.toString();
+
+        // Déterminer le content-type à partir de l’extension
+        MediaType _guessMediaType(String path) {
+          final ext = path.split('.').last.toLowerCase();
+          switch (ext) {
+            case 'jpg':
+            case 'jpeg':
+              return MediaType('image', 'jpeg');
+            case 'png':
+              return MediaType('image', 'png');
+            case 'webp':
+              return MediaType('image', 'webp');
+            case 'gif':
+              return MediaType('image', 'gif');
+            default:
+              return MediaType('application', 'octet-stream');
+          }
+        }
+
+        request.files.add(await http.MultipartFile.fromPath(
+          'img_recu',
+          recuImage.path,
+          contentType: _guessMediaType(recuImage.path),
+          filename: recuImage.name,
+        ));
+
+        final streamed = await request.send();
+        final response = await http.Response.fromStream(streamed);
+        final data = json.decode(response.body);
+        if (response.statusCode == 200) {
+          return {
+            'ok': data['status'] == 'success',
+            'status': data['status'],
+            'message': data['message'],
+            'img_recu': data['img_recu'],
+          };
+        }
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+      }
+
+      // Fallback JSON (optionnellement avec base64)
+      String? dataUrl;
+      if (recuBytes != null && recuMimeType != null) {
+        final b64 = base64Encode(recuBytes);
+        dataUrl = 'data:$recuMimeType;base64,$b64';
+      }
+      final resp = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'telephone': telephone,
+          'nom': nom,
+          'montant': montant,
+          if (dataUrl != null) 'img_recu_base64': dataUrl,
+        }),
+      );
+      final data = json.decode(resp.body);
+      if (resp.statusCode == 200) {
+        return {
+          'ok': data['status'] == 'success',
+          'status': data['status'],
+          'message': data['message'],
+          'img_recu': data['img_recu'],
+        };
+      }
+      throw Exception('HTTP ${resp.statusCode}: ${resp.body}');
+    } catch (e) {
+      rethrow;
+    }
+  }
+
 /**
  * Récupère l'historique des bons avec pagination et filtres
  */
