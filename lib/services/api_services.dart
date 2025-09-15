@@ -65,6 +65,77 @@ class ApiService {
     }
   }
 
+  /// Calcule les statistiques de solde à partir de l'endpoint solde_evolution
+  /// Retourne: {
+  ///  'totalRechargement': double,
+  ///  'totalServi': double,
+  ///  'soldeActuel': double,
+  ///  'utilisation': double (0..1),
+  ///  'dernierRechargement': double?,
+  ///  'dateDernierRechargement': String? (YYYY-MM-DD)
+  /// }
+  Future<Map<String, dynamic>> fetchSoldeEvolutionStats(
+      {int? annee, int? mois}) async {
+    final rows = await fetchSoldeEvolution(annee: annee, mois: mois);
+    if (rows.isEmpty) {
+      return {
+        'totalRechargement': 0.0,
+        'totalServi': 0.0,
+        'soldeActuel': 0.0,
+        'utilisation': 0.0,
+        'dernierRechargement': null,
+        'dateDernierRechargement': null,
+      };
+    }
+
+    // Trier par date si possible
+    final sorted = [...rows];
+    sorted.sort((a, b) {
+      final da = DateTime.tryParse((a['date'] ?? a['jour'] ?? '').toString()) ??
+          DateTime(1970);
+      final db = DateTime.tryParse((b['date'] ?? b['jour'] ?? '').toString()) ??
+          DateTime(1970);
+      return da.compareTo(db);
+    });
+
+    double totalIn = 0, totalOut = 0;
+    double? lastIn;
+    String? lastInDateStr;
+
+    for (final r in sorted) {
+      final inVal = _toDouble(r['rechargement'] ?? r['entree']);
+      final outVal =
+          _toDouble(r['sortie_servie'] ?? r['demande_servie'] ?? r['sortie']);
+      totalIn += inVal;
+      totalOut += outVal;
+
+      if (inVal > 0) {
+        lastIn = inVal;
+        lastInDateStr = (r['date'] ?? r['jour'])?.toString();
+      }
+    }
+
+    final solde = totalIn - totalOut;
+    final util = totalIn > 0 ? (totalOut / totalIn).clamp(0.0, 1.0) : 0.0;
+
+    return {
+      'totalRechargement': totalIn,
+      'totalServi': totalOut,
+      'soldeActuel': solde,
+      'utilisation': util,
+      'dernierRechargement': lastIn,
+      'dateDernierRechargement': lastInDateStr,
+    };
+  }
+
+  double _toDouble(dynamic v) {
+    if (v == null) return 0.0;
+    if (v is num) return v.toDouble();
+    return double.tryParse(
+            v.toString().replaceAll(' ', '').replaceAll('\u00A0', '')) ??
+        0.0;
+  }
+
 /**
  * Récupère la liste des stations de service.
  * Retourne une liste de maps avec les informations des stations.

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import '../widgets/solde_widget.dart';
+import 'package:intl/intl.dart';
 import '../widgets/station_selection_dialog.dart';
 import '../widgets/graphique_widget.dart';
 import '../widgets/solde_evolution_widget.dart';
@@ -18,12 +18,13 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   final ApiService apiService = ApiService();
-  late Future<Map<String, dynamic>> soldeFuture;
+  late Future<Map<String, dynamic>> soldeStatsFuture;
+  final _fmt = NumberFormat("#,##0", "fr_FR");
 
   @override
   void initState() {
     super.initState();
-    soldeFuture = apiService.fetchSolde();
+    soldeStatsFuture = apiService.fetchSoldeEvolutionStats();
 
     // Demande la permission (iOS)
     FirebaseMessaging.instance.requestPermission();
@@ -65,7 +66,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 SnackBar(content: Text("Rechargement effectué avec succès !")),
               );
               setState(() {
-                soldeFuture = apiService.fetchSolde();
+                soldeStatsFuture = apiService.fetchSoldeEvolutionStats();
               });
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -115,7 +116,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       endDrawer: LogistiqueDrawer(),
       body: FutureBuilder<Map<String, dynamic>>(
-        future: soldeFuture,
+        future: soldeStatsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator());
@@ -128,10 +129,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SoldeWidget(
-                    solde: data['solde'],
-                    dernierCredit: data['dernierCredit'],
+                  _SoldeStatsCard(
+                    solde: (data['soldeActuel'] ?? 0).toDouble(),
+                    totalIn: (data['totalRechargement'] ?? 0).toDouble(),
+                    totalOut: (data['totalServi'] ?? 0).toDouble(),
+                    utilisation: (data['utilisation'] ?? 0).toDouble(),
+                    dernierIn:
+                        (data['dernierRechargement'] as num?)?.toDouble(),
+                    dernierInDate: data['dateDernierRechargement']?.toString(),
                     onRecharge: _onRechargePressed,
+                    fmt: _fmt,
                   ),
                   SizedBox(height: 20),
                   GraphiqueWidget(),
@@ -209,6 +216,195 @@ class MenuItem extends StatelessWidget {
         trailing:
             Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
         onTap: onTap, // Utilise le onTap passé en paramètre
+      ),
+    );
+  }
+}
+
+class _SoldeStatsCard extends StatelessWidget {
+  final double solde;
+  final double totalIn;
+  final double totalOut;
+  final double utilisation; // 0..1
+  final double? dernierIn;
+  final String? dernierInDate;
+  final VoidCallback onRecharge;
+  final NumberFormat fmt;
+
+  const _SoldeStatsCard({
+    required this.solde,
+    required this.totalIn,
+    required this.totalOut,
+    required this.utilisation,
+    required this.onRecharge,
+    required this.fmt,
+    this.dernierIn,
+    this.dernierInDate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final percent = (utilisation * 100).round();
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF223C4A),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Solde actuel",
+                      style: TextStyle(color: Colors.white70)),
+                  const SizedBox(height: 4),
+                  Text("${fmt.format(solde)} F CFA",
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold)),
+                ],
+              ),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00A9A5),
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: onRecharge,
+                icon: const Icon(Icons.add),
+                label: const Text('Recharger'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("$percent% utilisé",
+                  style: const TextStyle(color: Colors.white70)),
+              Text("${fmt.format(totalOut)} / ${fmt.format(totalIn)}",
+                  style: const TextStyle(color: Colors.white54, fontSize: 12)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              minHeight: 10,
+              value: utilisation.clamp(0.0, 1.0),
+              backgroundColor: Colors.white12,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                utilisation >= 0.9
+                    ? Colors.redAccent
+                    : (utilisation >= 0.6
+                        ? Colors.orangeAccent
+                        : Colors.greenAccent),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _StatTile(
+                  label: "Total rechargé",
+                  value: "${fmt.format(totalIn)} F",
+                  color: Colors.greenAccent,
+                  icon: Icons.trending_up,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatTile(
+                  label: "Total servi",
+                  value: "${fmt.format(totalOut)} F",
+                  color: Colors.redAccent,
+                  icon: Icons.local_gas_station,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if ((dernierIn ?? 0) > 0)
+            Row(
+              children: [
+                const Icon(Icons.receipt_long, color: Colors.white38, size: 18),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    "Dernier rechargement: ${fmt.format(dernierIn)} F"
+                    "${(dernierInDate ?? '').isNotEmpty ? " (" + _humanDate(dernierInDate!) + ")" : ""}",
+                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  static String _humanDate(String iso) {
+    try {
+      final d = DateTime.tryParse(iso);
+      if (d == null) return iso;
+      return "${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}";
+    } catch (_) {
+      return iso;
+    }
+  }
+}
+
+class _StatTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  final IconData icon;
+
+  const _StatTile({
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A2F3A),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: color.withOpacity(0.2),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style:
+                        const TextStyle(color: Colors.white70, fontSize: 12)),
+                const SizedBox(height: 2),
+                Text(value,
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
