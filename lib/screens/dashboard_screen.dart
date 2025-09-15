@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../widgets/station_selection_dialog.dart';
 import '../widgets/graphique_widget.dart';
 import '../widgets/solde_evolution_widget.dart';
+import '../widgets/separate_charts_widget.dart';
 import '../services/api_services.dart';
 import 'historique_bons_screen.dart'; // Importer l'écran HistoriqueBonsScreen
 import 'demandes_en_attente_screen.dart'; // en haut du fichier
@@ -20,6 +21,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final ApiService apiService = ApiService();
   late Future<Map<String, dynamic>> soldeStatsFuture;
   final _fmt = NumberFormat("#,##0", "fr_FR");
+  bool _showSeparatedCharts = false;
 
   @override
   void initState() {
@@ -144,6 +146,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   GraphiqueWidget(),
                   SizedBox(height: 20),
                   SoldeEvolutionWidget(),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () {
+                        setState(
+                            () => _showSeparatedCharts = !_showSeparatedCharts);
+                      },
+                      icon: Icon(
+                        _showSeparatedCharts
+                            ? Icons.expand_less
+                            : Icons.expand_more,
+                        color: Colors.white70,
+                      ),
+                      label: Text(
+                        _showSeparatedCharts
+                            ? 'Masquer les graphiques séparés'
+                            : 'Afficher les graphiques séparés',
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    ),
+                  ),
+                  if (_showSeparatedCharts) ...[
+                    SizedBox(height: 8),
+                    Card(
+                      color: Color(0xFF17333F),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: SeparateChartsWidget(),
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                  ],
                   SizedBox(height: 20),
                   MenuItem(
                     icon: Icons.receipt_long,
