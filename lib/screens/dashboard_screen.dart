@@ -11,6 +11,7 @@ import 'demandes_en_attente_screen.dart'; // en haut du fichier
 import 'parc_auto_screen.dart'; // Importer l'écran ParcAutoScreen
 import '../widgets/logistique_drawer.dart';
 import 'chauffeurs_screen.dart'; // Importer l'écran ChauffeursScreen
+import 'recapitulatif_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   @override
@@ -223,7 +224,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       );
                     },
                   ),
-                  MenuItem(icon: Icons.bar_chart, title: "Statistiques"),
+                  MenuItem(
+                    icon: Icons.bar_chart,
+                    title: "Récapitulatif",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const RecapitulatifScreen()),
+                      );
+                    },
+                  ),
                   SizedBox(height: 100),
                 ],
               ),

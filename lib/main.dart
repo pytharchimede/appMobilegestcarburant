@@ -1,5 +1,8 @@
 // Fichier principal Flutter : main.dart
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
@@ -28,6 +31,22 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  // Initialise les données locales Intl dynamiquement selon l'appareil
+  final deviceLocale = WidgetsBinding.instance.platformDispatcher.locale;
+  final candidates = <String>{
+    'fr',
+    'fr_FR',
+    deviceLocale.toString(),
+    deviceLocale.languageCode,
+  }.map((l) => Intl.canonicalizedLocale(l)).where((l) => l.isNotEmpty).toList();
+  for (final loc in candidates) {
+    try {
+      await initializeDateFormatting(loc);
+    } catch (_) {
+      // Ignorer les locales non supportées par intl
+    }
+  }
+  Intl.defaultLocale = Intl.canonicalizedLocale(deviceLocale.toString());
   // Ne pas enregistrer le background handler sur le Web (non supporté)
   if (!kIsWeb) {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -42,6 +61,29 @@ class GestionCarburantApp extends StatelessWidget {
       title: 'Gestion Carburant',
       theme: appThemeData,
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('fr', 'FR'),
+        Locale('en', 'US'),
+      ],
+      localeResolutionCallback: (locale, supported) {
+        // Détermine une locale supportée et synchronise Intl
+        Locale resolved = supported.first;
+        if (locale != null) {
+          for (final s in supported) {
+            if (s.languageCode == locale.languageCode) {
+              resolved = s;
+              break;
+            }
+          }
+        }
+        Intl.defaultLocale = Intl.canonicalizedLocale(resolved.toLanguageTag());
+        return resolved;
+      },
       navigatorObservers: [
         FirebaseAnalyticsObserver(analytics: analytics),
       ],

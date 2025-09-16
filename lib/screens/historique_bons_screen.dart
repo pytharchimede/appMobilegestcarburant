@@ -9,6 +9,13 @@ import 'package:gestion_carburant/screens/bon_detail_screen.dart';
 import '../services/api_services.dart';
 
 class HistoriqueBonsScreen extends StatefulWidget {
+  final DateTime? initialDateDebut;
+  final DateTime? initialDateFin;
+
+  const HistoriqueBonsScreen(
+      {Key? key, this.initialDateDebut, this.initialDateFin})
+      : super(key: key);
+
   @override
   State<HistoriqueBonsScreen> createState() => _HistoriqueBonsScreenState();
 }
@@ -39,7 +46,10 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadBons();
+    // Appliquer les dates initiales si fournies
+    dateDebut = widget.initialDateDebut;
+    dateFin = widget.initialDateFin;
+    _loadBons(reset: true);
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
               _scrollController.position.maxScrollExtent - 100 &&
