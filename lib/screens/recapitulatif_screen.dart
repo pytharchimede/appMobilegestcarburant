@@ -743,6 +743,25 @@ class _RecapitulatifScreenState extends State<RecapitulatifScreen> {
                   const pw.BoxDecoration(color: PdfColors.grey300),
               cellPadding: const pw.EdgeInsets.all(4),
             ),
+            pw.SizedBox(height: 8),
+            // Total sur l'ensemble exporté
+            pw.Align(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Text(
+                'Total: ' +
+                    _money.format(list.fold<double>(0, (sum, b) {
+                      final raw =
+                          (b['montant'] ?? b['quantite'] ?? '0').toString();
+                      final val = double.tryParse(raw
+                              .replaceAll(' ', '')
+                              .replaceAll('\u00A0', '')) ??
+                          0.0;
+                      return sum + val;
+                    })) +
+                    ' F',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              ),
+            ),
           ],
         ),
       );
@@ -1070,6 +1089,15 @@ class _LatestBonsTable extends StatelessWidget {
       return const Text('Aucun bon', style: TextStyle(color: Colors.white54));
     }
     final money = NumberFormat('#,##0', 'fr_FR');
+    // Total des montants pour le sous-ensemble filtré
+    final double totalMontant = bons.fold<double>(0, (sum, b) {
+      final raw = (b['montant'] ?? b['quantite'] ?? '0').toString();
+      final val = double.tryParse(
+            raw.replaceAll(' ', '').replaceAll('\u00A0', ''),
+          ) ??
+          0.0;
+      return sum + val;
+    });
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1160,6 +1188,23 @@ class _LatestBonsTable extends StatelessWidget {
                   ],
                 );
               }).take(10),
+              // Ligne de total (sur l'ensemble filtré)
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
+                  children: [
+                    const Spacer(),
+                    Text(
+                      'Total (filtré): ${money.format(totalMontant)} F',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
