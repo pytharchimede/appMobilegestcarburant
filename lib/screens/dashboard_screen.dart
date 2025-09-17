@@ -12,6 +12,7 @@ import 'parc_auto_screen.dart'; // Importer l'écran ParcAutoScreen
 import '../widgets/logistique_drawer.dart';
 import 'chauffeurs_screen.dart'; // Importer l'écran ChauffeursScreen
 import 'recapitulatif_screen.dart';
+import 'rechargements_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   @override
@@ -221,6 +222,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => ChauffeursScreen()),
+                      );
+                    },
+                  ),
+                  MenuItem(
+                    icon: Icons.add_circle,
+                    title: "Rechargements station",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const RechargementsScreen()),
                       );
                     },
                   ),

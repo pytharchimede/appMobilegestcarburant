@@ -136,6 +136,64 @@ class ApiService {
         0.0;
   }
 
+  /// Récupère l'historique des rechargements de station.
+  /// Retourne un map: {
+  ///   'rechargements': List<Map<String, dynamic>>,
+  ///   'hasMore': bool,
+  ///   'totalMontant': double,
+  /// }
+  Future<Map<String, dynamic>> fetchRechargements({
+    int page = 1,
+    DateTime? dateDebut,
+    DateTime? dateFin,
+  }) async {
+    final params = <String, String>{
+      'endpoint': 'historique_rechargements',
+      'page': page.toString(),
+    };
+    String fmt(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    if (dateDebut != null) params['date_debut'] = fmt(dateDebut);
+    if (dateFin != null) params['date_fin'] = fmt(dateFin);
+
+    final uri = Uri.parse(baseUrl).replace(queryParameters: params);
+    final response = await http.get(uri);
+    if (response.statusCode != 200) {
+      throw Exception('Erreur lors du chargement des rechargements');
+    }
+    final data = json.decode(response.body);
+    final ok = (data is Map) && (data['status'] == 'success');
+    if (!ok) {
+      throw Exception(data['message'] ?? 'Réponse invalide rechargements');
+    }
+    // Supporte structures différentes
+    final payload = (data['data'] ?? data);
+    final list =
+        (payload['rechargements'] ?? payload['rows'] ?? payload) as dynamic;
+    final items = List<Map<String, dynamic>>.from(
+        list is List ? list : (list is Map ? [list] : []));
+
+    // hasMore / total
+    final hasMore =
+        (payload['hasMore'] ?? payload['has_more'] ?? false) == true;
+    double total = 0.0;
+    if (payload['totalMontant'] != null) {
+      total = _toDouble(payload['totalMontant']);
+    } else if (payload['total'] != null) {
+      total = _toDouble(payload['total']);
+    } else {
+      for (final r in items) {
+        total += _toDouble(r['montant'] ?? r['rechargement'] ?? r['entree']);
+      }
+    }
+
+    return {
+      'rechargements': items,
+      'hasMore': hasMore,
+      'totalMontant': total,
+    };
+  }
+
 /**
  * Récupère la liste des stations de service.
  * Retourne une liste de maps avec les informations des stations.
