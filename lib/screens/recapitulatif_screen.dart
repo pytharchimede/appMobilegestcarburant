@@ -37,6 +37,7 @@ class _RecapitulatifScreenState extends State<RecapitulatifScreen> {
   Map<DateTime, double> bonsParJour = {};
   double totalRechargement = 0;
   double totalServi = 0;
+  double soldeActuel = 0;
 
   // Statuts
   int nbDecaisse = 0;
@@ -220,12 +221,21 @@ class _RecapitulatifScreenState extends State<RecapitulatifScreen> {
               await api.fetchSoldeEvolutionStats(annee: d.year, mois: d.month);
           inTotal = (stats['totalRechargement'] ?? 0).toDouble();
           outTotal = (stats['totalServi'] ?? 0).toDouble();
+          // solde actuel global si présent
+          soldeActuel = (stats['soldeActuel'] ?? soldeActuel).toDouble();
         } else if (period == RecapPeriod.year) {
           final y = range!.start.year;
           final stats = await api.fetchSoldeEvolutionStats(annee: y);
           inTotal = (stats['totalRechargement'] ?? 0).toDouble();
           outTotal = (stats['totalServi'] ?? 0).toDouble();
+          soldeActuel = (stats['soldeActuel'] ?? soldeActuel).toDouble();
         }
+      } catch (_) {}
+
+      // Toujours récupérer le solde actuel global (reste en station)
+      try {
+        final statsNow = await api.fetchSoldeEvolutionStats();
+        soldeActuel = (statsNow['soldeActuel'] ?? soldeActuel).toDouble();
       } catch (_) {}
 
       setState(() {
@@ -241,6 +251,7 @@ class _RecapitulatifScreenState extends State<RecapitulatifScreen> {
         mtAnnule = tAnn;
         totalRechargement = inTotal;
         totalServi = outTotal;
+        this.soldeActuel = soldeActuel;
         loading = false;
       });
     } catch (e) {
@@ -323,6 +334,8 @@ class _RecapitulatifScreenState extends State<RecapitulatifScreen> {
             else ...[
               _KpiRow(
                 items: [
+                  _Kpi('Reste en station', '${_money.format(soldeActuel)} F',
+                      Icons.local_gas_station, Colors.tealAccent),
                   _Kpi('Bons générés', _short.format(bonsCount),
                       Icons.receipt_long, Colors.blueAccent),
                   _Kpi('Montant des bons', '${_money.format(bonsTotal)} F',
@@ -626,6 +639,12 @@ class _RecapitulatifScreenState extends State<RecapitulatifScreen> {
     }
     try {
       final sb = StringBuffer();
+      // En-tête récap
+      sb.writeln('Récapitulatif des bons');
+      sb.writeln(_periodTitle());
+      sb.writeln('Solde actuel;${_money.format(soldeActuel)} F');
+      sb.writeln('');
+      // Tableau
       sb.writeln('Code;Montant;Bénéficiaire;Date;Statut');
       for (final b in list) {
         final code = (b['code_bon'] ?? '').toString();
@@ -657,6 +676,12 @@ class _RecapitulatifScreenState extends State<RecapitulatifScreen> {
     try {
       final book = xls.Excel.createExcel();
       final sheet = book['Recap'];
+      // En-tête récap
+      sheet.appendRow(['Récapitulatif des bons']);
+      sheet.appendRow([_periodTitle()]);
+      sheet.appendRow(['Solde actuel', '${_money.format(soldeActuel)} F']);
+      sheet.appendRow(['']);
+      // Tableau
       sheet.appendRow(['Code', 'Montant', 'Bénéficiaire', 'Date', 'Statut']);
       for (final b in list) {
         final code = (b['code_bon'] ?? '').toString();
@@ -697,6 +722,8 @@ class _RecapitulatifScreenState extends State<RecapitulatifScreen> {
                     pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 8),
             pw.Text(_periodTitle()),
+            pw.SizedBox(height: 6),
+            pw.Text('Solde actuel: ${_money.format(soldeActuel)} F'),
             pw.SizedBox(height: 12),
             pw.Table.fromTextArray(
               headers: ['Code', 'Montant', 'Bénéficiaire', 'Date', 'Statut'],
