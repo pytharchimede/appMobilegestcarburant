@@ -11,6 +11,7 @@ class BonDetailScreen extends StatelessWidget {
     final montant = double.tryParse(bon['montant'].toString()) ?? 0;
     final photoUrl =
         bon['photo_url']; // Mets ici la clé réelle si tu as une photo
+    final code = (bon['code_bon'] ?? bon['num_fiche'] ?? '').toString();
 
     return Scaffold(
       backgroundColor: Color(0xFF17333F),
@@ -47,7 +48,7 @@ class BonDetailScreen extends StatelessWidget {
                   // QR Code
                   QrImageView(
                     data:
-                        'https://fidest.ci/decaissement/bon_essence.php?id_bon=${bon['num_fiche'] ?? ''}',
+                        'https://fidest.ci/decaissement/bon/bon_essence.php?id_bon=$code',
                     version: QrVersions.auto,
                     size: 100,
                     backgroundColor: Colors.white,

@@ -137,9 +137,12 @@ class _BonsDuJourScreenState extends State<BonsDuJourScreen> {
                                       .replaceAll(' ', '')
                                       .replaceAll('\u00A0', '')) ??
                               0.0);
-                          final lien = (b['lien'] ?? b['url'] ?? '').toString();
+                          // Lien correct du bon d'essence à partager
+                          final lienBon =
+                              'https://fidest.ci/decaissement/bon/bon_essence.php?id_bon=$code';
+                          // Message conforme à la demande
                           final txt =
-                              'Bon $code — $bene — $montant F${lien.isNotEmpty ? "\n$lien" : ''}';
+                              "Bonjour, voici votre bon d'essence : $lienBon";
                           return Container(
                             decoration: BoxDecoration(
                               color: const Color(0xFF223C4A),
