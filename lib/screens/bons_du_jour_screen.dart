@@ -131,6 +131,9 @@ class _BonsDuJourScreenState extends State<BonsDuJourScreen> {
                           final b = _items[i];
                           final code = (b['code_bon'] ?? '').toString();
                           final bene = (b['nom_beneficiaire'] ?? '').toString();
+                          final motif =
+                              (b['motif'] ?? b['note'] ?? b['notes'] ?? '')
+                                  .toString();
                           final montant = _money.format(double.tryParse(
                                   (b['montant'] ?? b['quantite'] ?? '0')
                                       .toString()
@@ -141,8 +144,10 @@ class _BonsDuJourScreenState extends State<BonsDuJourScreen> {
                           final lienBon =
                               'https://fidest.ci/decaissement/bon/bon_essence.php?id_bon=$code';
                           // Message conforme à la demande
+                          final withMotif =
+                              motif.trim().isNotEmpty ? " pour $motif" : '';
                           final txt =
-                              "Bonjour, voici votre bon d'essence : $lienBon";
+                              "Bonjour, voici votre bon d'essence émis par $bene$withMotif d'un montant de $montant F:\n$lienBon";
                           return Container(
                             decoration: BoxDecoration(
                               color: const Color(0xFF223C4A),
