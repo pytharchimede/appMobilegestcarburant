@@ -520,6 +520,30 @@ class ApiService {
     }
   }
 
+  /// Désactive un bon par son code. Retourne true si succès.
+  /// Hypothèse d'endpoint: 'desactiver_bon' (à adapter selon le backend)
+  Future<bool> desactiverBon({
+    required String codeBon,
+    String? motif,
+  }) async {
+    final uri = Uri.parse('$baseUrl?endpoint=desactiver_bon');
+    final resp = await http.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'code_bon': codeBon,
+        if (motif != null && motif.isNotEmpty) 'motif': motif,
+      }),
+    );
+    if (resp.statusCode != 200) return false;
+    try {
+      final data = json.decode(resp.body);
+      return (data is Map) && (data['status'] == 'success');
+    } catch (_) {
+      return false;
+    }
+  }
+
 //Accepter demande de carburant
   Future<bool> accepterDemandeCarburant(String numFiche) async {
     final response = await http.post(

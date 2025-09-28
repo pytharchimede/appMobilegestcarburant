@@ -14,6 +14,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'screens/dashboard_screen.dart';
 import 'screens/login_screen.dart'; // À créer pour le bouton Google
 import 'utils/theme.dart';
+import 'utils/notification_helper.dart';
 
 final FirebaseAnalytics analytics = FirebaseAnalytics.instance;
 
@@ -51,6 +52,8 @@ void main() async {
   if (!kIsWeb) {
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   }
+  // Notifications locales (Android/iOS)
+  await NotificationHelper.instance.init();
   runApp(GestionCarburantApp());
 }
 

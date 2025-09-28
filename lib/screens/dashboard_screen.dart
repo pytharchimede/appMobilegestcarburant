@@ -13,6 +13,10 @@ import '../widgets/logistique_drawer.dart';
 import 'chauffeurs_screen.dart'; // Importer l'écran ChauffeursScreen
 import 'recapitulatif_screen.dart';
 import 'rechargements_screen.dart';
+import 'bons_en_service_screen.dart';
+import 'bons_du_jour_screen.dart';
+import 'bons_doublons_screen.dart';
+import '../utils/notification_helper.dart';
 
 class DashboardScreen extends StatefulWidget {
   @override
@@ -24,6 +28,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late Future<Map<String, dynamic>> soldeStatsFuture;
   final _fmt = NumberFormat("#,##0", "fr_FR");
   bool _showSeparatedCharts = false;
+  int _pendingDemandes = 0;
+  int _doublons = 0;
+  bool _announced = false;
 
   @override
   void initState() {
@@ -50,6 +57,75 @@ class _DashboardScreenState extends State<DashboardScreen> {
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       // Navigue ou affiche une page spécifique
     });
+
+    // Charger les compteurs pour badges
+    _loadPendingCounts();
+  }
+
+  Future<void> _loadPendingCounts() async {
+    // Demandes en attente
+    try {
+      final list = await apiService.fetchDemandesEnAttente();
+      if (mounted) setState(() => _pendingDemandes = list.length);
+    } catch (_) {}
+
+    // Doublons (par code) calculés côté client sur quelques pages pour éviter les charges
+    _computeDoublonsCount(maxPages: 20);
+  }
+
+  Future<void> _computeDoublonsCount({int maxPages = 20}) async {
+    int page = 1;
+    bool hasMore = true;
+    final Map<String, int> occ = {};
+    while (hasMore && page <= maxPages) {
+      try {
+        final resp = await apiService.fetchBons(page: page);
+        final bons = List<Map<String, dynamic>>.from(resp['bons']);
+        for (final b in bons) {
+          final des = int.tryParse((b['desactive'] ?? '0').toString()) ?? 0;
+          if (des != 0) continue;
+          final code = (b['code_bon'] ?? '').toString();
+          if (code.isEmpty) continue;
+          occ.update(code, (v) => v + 1, ifAbsent: () => 1);
+        }
+        final dupCount = occ.values.where((c) => c >= 2).length;
+        if (mounted) setState(() => _doublons = dupCount);
+        hasMore = resp['hasMore'] == true;
+        page++;
+        if (bons.isEmpty) break;
+      } catch (_) {
+        break;
+      }
+    }
+    _announceIfNeeded();
+  }
+
+  void _announceIfNeeded() {
+    if (_announced) return;
+    if (!mounted) return;
+    if (_pendingDemandes > 0 || _doublons > 0) {
+      _announced = true;
+      if (_pendingDemandes > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$_pendingDemandes demande(s) en attente')),
+        );
+        NotificationHelper.instance.showSimple(
+          id: 101,
+          title: 'Demandes en attente',
+          body: '$_pendingDemandes demande(s) requièrent votre action',
+        );
+      }
+      if (_doublons > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$_doublons doublon(s) détecté(s)')),
+        );
+        NotificationHelper.instance.showSimple(
+          id: 102,
+          title: 'Doublons détectés',
+          body: '$_doublons doublon(s) de bons à vérifier',
+        );
+      }
+    }
   }
 
   void _onRechargePressed() {
@@ -197,6 +273,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   MenuItem(
                     icon: Icons.pending_actions,
                     title: "Demandes en attente",
+                    badgeCount: _pendingDemandes,
                     onTap: () {
                       Navigator.push(
                         context,
@@ -247,6 +324,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       );
                     },
                   ),
+                  // Nouveaux accès après Récapitulatif
+                  MenuItem(
+                    icon: Icons.local_gas_station,
+                    title: "Bons en cours de service",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const BonsEnServiceScreen()),
+                      );
+                    },
+                  ),
+                  MenuItem(
+                    icon: Icons.today,
+                    title: "Bons du jour",
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const BonsDuJourScreen()),
+                      );
+                    },
+                  ),
+                  MenuItem(
+                    icon: Icons.copy_all,
+                    title: "Doublons (par code)",
+                    badgeCount: _doublons,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const BonsDoublonsScreen()),
+                      );
+                    },
+                  ),
                   SizedBox(height: 100),
                 ],
               ),
@@ -262,19 +374,44 @@ class MenuItem extends StatelessWidget {
   final IconData icon;
   final String title;
   final VoidCallback? onTap; // Ajoute ce paramètre
-
-  const MenuItem({required this.icon, required this.title, this.onTap});
+  final int? badgeCount;
+  const MenuItem(
+      {required this.icon, required this.title, this.onTap, this.badgeCount});
 
   @override
   Widget build(BuildContext context) {
+    final bc = (badgeCount ?? 0);
     return Card(
       color: Color(0xFF17333F),
-      child: ListTile(
-        leading: Icon(icon, color: Colors.white),
-        title: Text(title, style: TextStyle(color: Colors.white)),
-        trailing:
-            Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
-        onTap: onTap, // Utilise le onTap passé en paramètre
+      child: Stack(
+        children: [
+          ListTile(
+            leading: Icon(icon, color: Colors.white),
+            title: Text(title, style: TextStyle(color: Colors.white)),
+            trailing:
+                Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
+            onTap: onTap,
+          ),
+          if (bc > 0)
+            Positioned(
+              right: 36,
+              top: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  bc > 99 ? '99+' : bc.toString(),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
