@@ -128,6 +128,138 @@ class ApiService {
     };
   }
 
+  // ===================== FULL HISTORY (toute l'activité) =====================
+  // Cache mémoire simple (TTL 1h)
+  static List<Map<String, dynamic>>? _fullHistoryCache;
+  static DateTime? _fullHistoryCacheTime;
+  static const Duration _fullHistoryTtl = Duration(hours: 1);
+
+  /// Récupère et agrège toute l'activité (mois par mois) jusqu'à la date actuelle.
+  /// - maxYears: limite de sécurité (par défaut 10)
+  /// - forceRefresh: pour ignorer le cache
+  /// L'API sous-jacente est mensuelle via `fetchSoldeEvolution(annee, mois)`.
+  Future<List<Map<String, dynamic>>> fetchSoldeEvolutionFullHistory({
+    int maxYears = 10,
+    bool forceRefresh = false,
+  }) async {
+    // Cache valide ?
+    if (!forceRefresh &&
+        _fullHistoryCache != null &&
+        _fullHistoryCacheTime != null) {
+      if (DateTime.now().difference(_fullHistoryCacheTime!) < _fullHistoryTtl) {
+        return _fullHistoryCache!;
+      }
+    }
+
+    final now = DateTime.now();
+    final int currentYear = now.year;
+    final int currentMonth = now.month;
+    final int firstYear = (currentYear - maxYears + 1).clamp(1970, currentYear);
+
+    final List<Map<String, dynamic>> aggregated = [];
+    // Parcours ascendant année/mois pour garder l'ordre chronologique naturel
+    for (int y = firstYear; y <= currentYear; y++) {
+      final int startMonth = (y == firstYear) ? 1 : 1;
+      final int endMonth = (y == currentYear) ? currentMonth : 12;
+      for (int m = startMonth; m <= endMonth; m++) {
+        try {
+          final monthRows = await fetchSoldeEvolution(annee: y, mois: m);
+          for (final r in monthRows) {
+            // Normalisation des champs importants
+            final map = Map<String, dynamic>.from(r);
+            // Uniformiser la clé date (si 'jour' seulement, on reconstruit une date approximative AAAA-MM-JJ)
+            if (!(map.containsKey('date')) ||
+                (map['date']?.toString().isEmpty ?? true)) {
+              final dayRaw = map['jour']?.toString();
+              if (dayRaw != null) {
+                final d = int.tryParse(dayRaw) ?? 1;
+                final mm = m.toString().padLeft(2, '0');
+                final dd = d.toString().padLeft(2, '0');
+                map['date'] = '$y-$m-$dd'.replaceFirst('-$m-', '-$mm-');
+              }
+            }
+            aggregated.add(map);
+          }
+        } catch (_) {
+          // On ignore les erreurs d'un mois isolé et on continue
+        }
+      }
+    }
+
+    // Tri final par date
+    aggregated.sort((a, b) {
+      final da = DateTime.tryParse((a['date'] ?? a['jour'] ?? '').toString()) ??
+          DateTime(1970);
+      final db = DateTime.tryParse((b['date'] ?? b['jour'] ?? '').toString()) ??
+          DateTime(1970);
+      return da.compareTo(db);
+    });
+
+    _fullHistoryCache = aggregated;
+    _fullHistoryCacheTime = DateTime.now();
+    return aggregated;
+  }
+
+  /// Calcule les statistiques globales sur toute l'activité (utilise fetchSoldeEvolutionFullHistory).
+  Future<Map<String, dynamic>> fetchSoldeEvolutionStatsAll({
+    int maxYears = 10,
+    bool forceRefresh = false,
+  }) async {
+    final rows = await fetchSoldeEvolutionFullHistory(
+        maxYears: maxYears, forceRefresh: forceRefresh);
+    if (rows.isEmpty) {
+      return {
+        'totalRechargement': 0.0,
+        'totalServi': 0.0,
+        'soldeActuel': 0.0,
+        'utilisation': 0.0,
+        'dernierRechargement': null,
+        'dateDernierRechargement': null,
+        'premiereDate': null,
+        'derniereDate': null,
+        'nbJours': 0,
+      };
+    }
+    double totalIn = 0.0, totalOut = 0.0;
+    double? lastIn;
+    String? lastInDate;
+    final Set<String> joursDistincts = {};
+    for (final r in rows) {
+      final inVal = _toDouble(r['rechargement'] ?? r['entree']);
+      final outVal =
+          _toDouble(r['sortie_servie'] ?? r['demande_servie'] ?? r['sortie']);
+      totalIn += inVal;
+      totalOut += outVal;
+      if (inVal > 0) {
+        lastIn = inVal;
+        lastInDate = (r['date'] ?? r['jour'])?.toString();
+      }
+      final dateStr = (r['date'] ?? '').toString();
+      if (dateStr.length >= 10) {
+        joursDistincts.add(dateStr.substring(0, 10));
+      }
+    }
+    final solde = totalIn - totalOut;
+    final util = totalIn > 0 ? (totalOut / totalIn).clamp(0.0, 1.0) : 0.0;
+    final premiereDate = rows.firstWhere(
+        (e) => (e['date'] ?? '').toString().isNotEmpty,
+        orElse: () => {});
+    final derniereDate = rows.lastWhere(
+        (e) => (e['date'] ?? '').toString().isNotEmpty,
+        orElse: () => {});
+    return {
+      'totalRechargement': totalIn,
+      'totalServi': totalOut,
+      'soldeActuel': solde,
+      'utilisation': util,
+      'dernierRechargement': lastIn,
+      'dateDernierRechargement': lastInDate,
+      'premiereDate': premiereDate['date'],
+      'derniereDate': derniereDate['date'],
+      'nbJours': joursDistincts.length,
+    };
+  }
+
   double _toDouble(dynamic v) {
     if (v == null) return 0.0;
     if (v is num) return v.toDouble();
