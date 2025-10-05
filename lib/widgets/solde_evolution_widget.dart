@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'dart:math' as math;
 import '../services/api_services.dart';
 import '../services/export_service.dart';
+import 'package:share_plus/share_plus.dart';
 
 class SoldeEvolutionWidget extends StatefulWidget {
   @override
@@ -282,8 +283,11 @@ class _ExportMenu extends StatelessWidget {
             await ExportService.openFile(f);
           } else if (v == 'share') {
             final summary = _buildSummary(stats);
-            messenger.showSnackBar(SnackBar(
-                content: Text('Résumé prêt (${summary.length} caractères).')));
+            await Share.share(summary, subject: 'Résumé carburant');
+          } else if (v == 'share_pdf') {
+            final f = await ExportService.exportPdf(rows, stats ?? {});
+            await Share.shareXFiles([XFile(f.path)],
+                subject: 'Historique carburant (PDF)');
           }
         } catch (e) {
           messenger.showSnackBar(SnackBar(content: Text('Erreur: $e')));
@@ -294,6 +298,7 @@ class _ExportMenu extends StatelessWidget {
         PopupMenuItem(value: 'excel', child: Text('Exporter Excel')),
         PopupMenuItem(value: 'pdf', child: Text('Exporter PDF')),
         PopupMenuItem(value: 'share', child: Text('Partager résumé')),
+        PopupMenuItem(value: 'share_pdf', child: Text('Partager PDF')),
       ],
     );
   }

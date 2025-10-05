@@ -34,6 +34,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _pendingDemandes = 0;
   int _doublons = 0;
   bool _announced = false;
+  bool _lowStockBanner = false; // indique si on affiche la bannière bas stock
+  bool _wasAboveLowThreshold = true; // pour détecter transition
 
   @override
   void initState() {
@@ -378,6 +380,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       });
     }
+    // Alerte bas niveau (solde restant < 10% du total rechargé)
+    final totalRechargement = (stats['totalRechargement'] ?? 0).toDouble();
+    final soldeActuel = (stats['soldeActuel'] ?? 0).toDouble();
+    if (totalRechargement > 0) {
+      final restantPct = (soldeActuel / totalRechargement) * 100;
+      if (restantPct <= 10) {
+        // Transition ?
+        if (_wasAboveLowThreshold) {
+          _lowStockBanner = true;
+          _wasAboveLowThreshold = false;
+        }
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final msg =
+              'Alerte: seulement ${restantPct.toStringAsFixed(1)}% du stock reste';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg)),
+          );
+          NotificationHelper.instance.showSimple(
+            id: 103,
+            title: 'Stock carburant bas',
+            body: msg,
+          );
+        });
+      } else {
+        _wasAboveLowThreshold = true;
+        _lowStockBanner = false;
+      }
+    }
     return stats;
   }
 
@@ -412,6 +443,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         const SizedBox(height: 8),
         if (_statsCache != null) _buildDailyAverageBanner(),
+        if (_lowStockBanner) ...[
+          const SizedBox(height: 8),
+          _buildLowStockBanner(),
+        ],
       ],
     );
   }
@@ -445,6 +480,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         )
       ]),
+    );
+  }
+
+  Widget _buildLowStockBanner() {
+    final totalRechargement =
+        (_statsCache?['totalRechargement'] ?? 0).toDouble();
+    final soldeActuel = (_statsCache?['soldeActuel'] ?? 0).toDouble();
+    if (totalRechargement <= 0) return const SizedBox.shrink();
+    final restantPct = (soldeActuel / totalRechargement * 100).clamp(0, 100);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: [
+          Colors.redAccent.withOpacity(0.25),
+          const Color(0xFF223C4A)
+        ]),
+        borderRadius: BorderRadius.circular(12),
+        border:
+            Border.all(color: Colors.redAccent.withOpacity(0.5), width: 0.8),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded,
+              color: Colors.redAccent, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Stock restant critique: ${restantPct.toStringAsFixed(1)}% (${_fmt.format(soldeActuel)} FCFA)',
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() => _lowStockBanner = false);
+            },
+            child: const Text('Masquer',
+                style: TextStyle(color: Colors.white54, fontSize: 12)),
+          )
+        ],
+      ),
     );
   }
 }

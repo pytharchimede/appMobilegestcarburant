@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:flutter/services.dart';
+import '../services/export_service.dart';
 
 class BonDetailScreen extends StatelessWidget {
   final Map<String, dynamic> bon;
@@ -18,6 +20,37 @@ class BonDetailScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Color(0xFF17333F),
         title: Text("Détail du bon"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            tooltip: 'Exporter PDF',
+            onPressed: () async {
+              try {
+                final file = await ExportService.exportBonPdf(bon);
+                await ExportService.openFile(file);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('PDF généré')),
+                );
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Erreur génération PDF')),
+                );
+              }
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.copy),
+            tooltip: 'Copier code',
+            onPressed: () async {
+              final code =
+                  (bon['code_bon'] ?? bon['num_fiche'] ?? '').toString();
+              await Clipboard.setData(ClipboardData(text: code));
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Code $code copié')),
+              );
+            },
+          )
+        ],
       ),
       body: Center(
         child: Card(

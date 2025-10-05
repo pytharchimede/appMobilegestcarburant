@@ -603,7 +603,33 @@ class ApiService {
     DateTime? dateFin,
     double? montantMin,
     double? montantMax,
+    bool useCache = true,
+    Duration? cacheTtl,
   }) async {
+    // Cache seulement si pas de filtres (sinon variations trop élevées)
+    final cacheEligible = useCache &&
+        station == null &&
+        dateDebut == null &&
+        dateFin == null &&
+        montantMin == null &&
+        montantMax == null;
+    if (cacheEligible) {
+      try {
+        final cache = await CacheService.loadBonsPage(page, ttl: cacheTtl);
+        final list = cache.$1;
+        final meta = cache.$2;
+        if (list != null && meta != null) {
+          final hasMore = (meta['hasMore_$page'] ?? false) == true;
+          final montantTotal = (meta['montantTotal'] ?? 0).toDouble();
+          return {
+            'bons': list,
+            'montantTotal': montantTotal,
+            'hasMore': hasMore,
+            'fromCache': true,
+          };
+        }
+      } catch (_) {}
+    }
     final Map<String, String> params = {
       'endpoint': 'historique_bons',
       'page': page.toString(),
@@ -620,17 +646,46 @@ class ApiService {
     final response = await http.get(uri);
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      if (data['status'] == 'success' && data['data'] != null) {
-        final d = data['data'];
-        return {
-          'bons': List<Map<String, dynamic>>.from(d['bons']),
-          'montantTotal': (d['montantTotal'] ?? 0).toDouble(),
-          'hasMore': d['hasMore'] ?? false,
-        };
-      } else {
-        throw Exception(data['message'] ??
-            "Erreur lors du chargement de l'historique des bons");
+      if (data['status'] != 'success') {
+        throw Exception(data['message'] ?? "Réponse invalide historique bons");
       }
+      final payload = data['data'] ?? data;
+      // Essayer différentes clés potentielles
+      dynamic rawList = payload['bons'] ?? payload['rows'] ?? payload['data'];
+      if (rawList == null && payload is List) rawList = payload;
+      if (rawList == null) rawList = [];
+      List<Map<String, dynamic>> list;
+      if (rawList is List) {
+        list = rawList
+            .map((e) => e is Map<String, dynamic>
+                ? e
+                : (e is Map ? e.cast<String, dynamic>() : <String, dynamic>{}))
+            .toList();
+      } else if (rawList is Map) {
+        list = [rawList.cast<String, dynamic>()];
+      } else {
+        list = [];
+      }
+
+      // Montant total: plusieurs variantes possibles
+      dynamic mt = payload['montantTotal'] ?? payload['total'] ?? 0;
+      double montantTotal = 0;
+      try {
+        montantTotal = _toDouble(mt);
+      } catch (_) {}
+      final hasMore =
+          (payload['hasMore'] ?? payload['has_more'] ?? false) == true;
+      if (cacheEligible) {
+        try {
+          await CacheService.saveBonsPage(page, list,
+              montantTotal: montantTotal, hasMore: hasMore);
+        } catch (_) {}
+      }
+      return {
+        'bons': list,
+        'montantTotal': montantTotal,
+        'hasMore': hasMore,
+      };
     } else {
       throw Exception('Erreur lors du chargement de l\'historique des bons');
     }

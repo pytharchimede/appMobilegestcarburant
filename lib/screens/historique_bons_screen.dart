@@ -2,11 +2,15 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:gestion_carburant/screens/bon_detail_screen.dart';
+import 'package:flutter/services.dart';
+import '../services/export_service.dart';
 import '../services/api_services.dart';
+import '../services/cache_service.dart';
 
 class HistoriqueBonsScreen extends StatefulWidget {
   final DateTime? initialDateDebut;
@@ -35,6 +39,8 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
   bool hasMore = true;
   int page = 1;
   double montantTotal = 0;
+  bool fromCacheGlobal =
+      false; // indique si la dernière page chargée venait du cache
 
   // Filtres
   String? station;
@@ -42,6 +48,8 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
   DateTime? dateFin;
   double? montantMin;
   double? montantMax;
+  String? statutFiltre; // 'servi','attente','annule'
+  String _searchCode = '';
 
   @override
   void initState() {
@@ -79,20 +87,29 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
         dateFin: dateFin,
         montantMin: montantMin,
         montantMax: montantMax,
+        cacheTtl: const Duration(hours: 1),
       );
       setState(() {
         bons.addAll(List<Map<String, dynamic>>.from(result['bons']));
         montantTotal = (result['montantTotal'] ?? 0.0).toDouble();
         hasMore = result['hasMore'] == true;
+        fromCacheGlobal = result['fromCache'] == true && page == 1;
         page++;
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Erreur de chargement")),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Erreur de chargement: ${e.toString()}")),
+        );
+      }
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
+  }
+
+  Future<void> _forceRefresh() async {
+    await CacheService.clearBonsCache();
+    await _loadBons(reset: true);
   }
 
   // Détermine l'état du bon et ses attributs d'affichage
@@ -318,6 +335,27 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: statutFiltre,
+                decoration: InputDecoration(
+                  labelText: 'Statut',
+                  labelStyle: const TextStyle(color: Colors.white70),
+                  filled: true,
+                  fillColor: const Color(0xFF223C4A),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                dropdownColor: const Color(0xFF223C4A),
+                style: const TextStyle(color: Colors.white),
+                items: const [
+                  DropdownMenuItem(value: null, child: Text('Tous')),
+                  DropdownMenuItem(value: 'servi', child: Text('Servi')),
+                  DropdownMenuItem(value: 'attente', child: Text('En attente')),
+                  DropdownMenuItem(value: 'annule', child: Text('Annulé')),
+                ],
+                onChanged: (v) => statutFiltre = v,
+              ),
             ],
           ),
         ),
@@ -363,6 +401,52 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
       ),
       body: Column(
         children: [
+          // Bandeau indicateur cache + refresh
+          if (fromCacheGlobal)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.blueGrey.shade700.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.offline_bolt, color: Colors.amber, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Affichage depuis le cache local (1h). Glissez vers le bas pour actualiser.',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _forceRefresh,
+                    child: const Text('Rafraîchir'),
+                  )
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Recherche code bon',
+                hintStyle: const TextStyle(color: Colors.white54),
+                prefixIcon: const Icon(Icons.search, color: Colors.white54),
+                filled: true,
+                fillColor: const Color(0xFF223C4A),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              style: const TextStyle(color: Colors.white),
+              onChanged: (v) =>
+                  setState(() => _searchCode = v.trim().toLowerCase()),
+            ),
+          ),
           Container(
             margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.all(16),
@@ -386,141 +470,241 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              itemCount: bons.length + (hasMore ? 1 : 0),
-              itemBuilder: (context, index) {
-                if (index >= bons.length) {
-                  return const Center(
-                      child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: CircularProgressIndicator(),
-                  ));
-                }
-                final bon = bons[index];
-                final status = _resolveBonStatus(bon);
-                return Card(
-                  color: const Color(0xFF223C4A),
-                  margin:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: ListTile(
-                    leading: Stack(
-                      alignment: Alignment.bottomRight,
-                      children: [
-                        const Icon(Icons.receipt, color: Colors.white),
-                        Container(
-                          margin: const EdgeInsets.only(top: 18),
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            color: status.color.withOpacity(0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child:
-                              Icon(status.icon, size: 14, color: status.color),
-                        ),
-                      ],
-                    ),
-                    title: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          bon['code_bon']?.toString() ?? '',
-                          style: const TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          "${formatMontant.format(double.tryParse(bon['montant'].toString()) ?? 0)} XOF",
-                          style: const TextStyle(
-                              color: Colors.greenAccent,
-                              fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 4),
-                        Text(
-                          bon['motif']?.toString() ?? '',
-                          style: const TextStyle(color: Colors.white70),
-                        ),
-                        const SizedBox(height: 6),
-                        // Badge d'état avec action Voir reçu
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: status.color.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color: status.color.withOpacity(0.4)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(status.icon, size: 14, color: status.color),
-                              const SizedBox(width: 6),
-                              Text(status.label,
-                                  style: TextStyle(
-                                      color: status.color,
-                                      fontWeight: FontWeight.w600)),
-                              if (status.hasReceipt) ...[
-                                const SizedBox(width: 10),
-                                InkWell(
-                                  onTap: () =>
-                                      _showReceiptDialog(status.receiptUrl!),
+            child: RefreshIndicator(
+              color: Colors.tealAccent,
+              backgroundColor: const Color(0xFF223C4A),
+              onRefresh: _forceRefresh,
+              child: CustomScrollView(
+                controller: _scrollController,
+                slivers: [
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        if (index >= bons.length)
+                          return const SizedBox.shrink();
+                        final bon = bons[index];
+                        if (!_matchesFilters(bon))
+                          return const SizedBox.shrink();
+                        final status = _resolveBonStatus(bon);
+                        return Card(
+                          color: const Color(0xFF223C4A),
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          child: ListTile(
+                            leading: Stack(
+                              alignment: Alignment.bottomRight,
+                              children: [
+                                const Icon(Icons.receipt, color: Colors.white),
+                                Container(
+                                  margin: const EdgeInsets.only(top: 18),
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    color: status.color.withOpacity(0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(status.icon,
+                                      size: 14, color: status.color),
+                                ),
+                              ],
+                            ),
+                            title: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  bon['code_bon']?.toString() ?? '',
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                  "${formatMontant.format(double.tryParse(bon['montant'].toString()) ?? 0)} XOF",
+                                  style: const TextStyle(
+                                      color: Colors.greenAccent,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 4),
+                                Text(
+                                  bon['motif']?.toString() ?? '',
+                                  style: const TextStyle(color: Colors.white70),
+                                ),
+                                const SizedBox(height: 6),
+                                // Badge d'état avec action Voir reçu
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: status.color.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                        color: status.color.withOpacity(0.4)),
+                                  ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
-                                    children: const [
-                                      Icon(Icons.image,
-                                          size: 14,
-                                          color: Colors.lightBlueAccent),
-                                      SizedBox(width: 4),
-                                      Text('Voir reçu',
+                                    children: [
+                                      Icon(status.icon,
+                                          size: 14, color: status.color),
+                                      const SizedBox(width: 6),
+                                      Text(status.label,
                                           style: TextStyle(
-                                              color: Colors.lightBlueAccent)),
+                                              color: status.color,
+                                              fontWeight: FontWeight.w600)),
+                                      if (status.hasReceipt) ...[
+                                        const SizedBox(width: 10),
+                                        InkWell(
+                                          onTap: () => _showReceiptDialog(
+                                              status.receiptUrl!),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: const [
+                                              Icon(Icons.image,
+                                                  size: 14,
+                                                  color:
+                                                      Colors.lightBlueAccent),
+                                              SizedBox(width: 4),
+                                              Text('Voir reçu',
+                                                  style: TextStyle(
+                                                      color: Colors
+                                                          .lightBlueAccent)),
+                                            ],
+                                          ),
+                                        ),
+                                      ]
                                     ],
                                   ),
                                 ),
-                              ]
-                            ],
+                                const SizedBox(height: 6),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.person,
+                                        color: Colors.white54, size: 16),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      bon['nom_beneficiaire']?.toString() ?? '',
+                                      style: const TextStyle(
+                                          color: Colors.white54),
+                                    ),
+                                    const Spacer(),
+                                    const Icon(Icons.calendar_today,
+                                        color: Colors.white54, size: 14),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      bon['date_demande']?.toString() ?? '',
+                                      style: const TextStyle(
+                                          color: Colors.white54),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            trailing: PopupMenuButton<String>(
+                              icon: const Icon(Icons.more_vert,
+                                  color: Colors.white70, size: 20),
+                              onSelected: (v) async {
+                                if (v == 'detail') {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => BonDetailScreen(bon: bon),
+                                    ),
+                                  );
+                                } else if (v == 'copy') {
+                                  final code = (bon['code_bon'] ??
+                                          bon['num_fiche'] ??
+                                          '')
+                                      .toString();
+                                  await Clipboard.setData(
+                                      ClipboardData(text: code));
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                          content: Text('Code $code copié')),
+                                    );
+                                  }
+                                } else if (v == 'pdf') {
+                                  try {
+                                    final file =
+                                        await ExportService.exportBonPdf(bon);
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                            content: Text('PDF généré')),
+                                      );
+                                    }
+                                    await ExportService.openFile(file);
+                                  } catch (e) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                            content: Text('Erreur PDF')),
+                                      );
+                                    }
+                                  }
+                                } else if (v == 'share') {
+                                  final code =
+                                      bon['code_bon']?.toString() ?? '';
+                                  final montant = double.tryParse(
+                                          bon['montant']?.toString() ?? '0') ??
+                                      0;
+                                  final motif = bon['motif']?.toString() ?? '';
+                                  final date =
+                                      bon['date_demande']?.toString() ?? '';
+                                  final beneficiaire =
+                                      bon['nom_beneficiaire']?.toString() ?? '';
+                                  final resume =
+                                      'Bon carburant $code\nMontant: ${formatMontant.format(montant)} XOF\nBénéficiaire: $beneficiaire\nMotif: $motif\nDate: $date';
+                                  _shareText(resume);
+                                } else if (v == 'recu' &&
+                                    status.hasReceipt &&
+                                    status.receiptUrl != null) {
+                                  _showReceiptDialog(status.receiptUrl!);
+                                }
+                              },
+                              itemBuilder: (c) => [
+                                const PopupMenuItem(
+                                    value: 'detail',
+                                    child: Text('Voir détail')),
+                                const PopupMenuItem(
+                                    value: 'copy', child: Text('Copier code')),
+                                const PopupMenuItem(
+                                    value: 'pdf', child: Text('Exporter PDF')),
+                                if (status.hasReceipt)
+                                  const PopupMenuItem(
+                                      value: 'recu', child: Text('Voir reçu')),
+                                const PopupMenuItem(
+                                    value: 'share', child: Text('Partager')),
+                              ],
+                            ),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => BonDetailScreen(bon: bon),
+                                ),
+                              );
+                            },
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            const Icon(Icons.person,
-                                color: Colors.white54, size: 16),
-                            const SizedBox(width: 4),
-                            Text(
-                              bon['nom_beneficiaire']?.toString() ?? '',
-                              style: const TextStyle(color: Colors.white54),
-                            ),
-                            const Spacer(),
-                            const Icon(Icons.calendar_today,
-                                color: Colors.white54, size: 14),
-                            const SizedBox(width: 4),
-                            Text(
-                              bon['date_demande']?.toString() ?? '',
-                              style: const TextStyle(color: Colors.white54),
-                            ),
-                          ],
-                        ),
-                      ],
+                        );
+                      },
+                      childCount: bons.length,
                     ),
-                    trailing: const Icon(Icons.arrow_forward_ios,
-                        color: Colors.white54, size: 16),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => BonDetailScreen(bon: bon),
-                        ),
-                      );
-                    },
                   ),
-                );
-              },
+                  SliverToBoxAdapter(
+                    child: hasMore
+                        ? const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        : const SizedBox(height: 40),
+                  )
+                ],
+              ),
             ),
           ),
         ],
@@ -673,5 +857,22 @@ class _ReceiptPreviewDialogBodyState extends State<_ReceiptPreviewDialogBody> {
         ],
       ),
     );
+  }
+}
+
+extension _BonShareExt on _HistoriqueBonsScreenState {
+  void _shareText(String text) => Share.share(text, subject: 'Bon carburant');
+  bool _matchesFilters(Map<String, dynamic> bon) {
+    if (_searchCode.isNotEmpty) {
+      final code =
+          (bon['code_bon'] ?? bon['num_fiche'] ?? '').toString().toLowerCase();
+      if (!code.contains(_searchCode)) return false;
+    }
+    if (statutFiltre == null) return true;
+    final s = _resolveBonStatus(bon);
+    if (statutFiltre == 'servi') return s.label == 'Déjà servi';
+    if (statutFiltre == 'attente') return s.label == 'En attente de service';
+    if (statutFiltre == 'annule') return s.label == 'Annulé';
+    return true;
   }
 }

@@ -5,6 +5,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:open_file/open_file.dart';
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 
 class ExportService {
   static Future<File> exportCsv(List<Map<String, dynamic>> rows,
@@ -92,6 +93,71 @@ class ExportService {
               ),
           ];
         }));
+    final dir = await _exportDir();
+    final file = File('${dir.path}/$fileName');
+    await file.writeAsBytes(await pdf.save());
+    return file;
+  }
+
+  /// Exporte un seul bon en PDF (fiche synthétique)
+  static Future<File> exportBonPdf(Map<String, dynamic> bon,
+      {String? fileName}) async {
+    final pdf = pw.Document();
+    final fmt = NumberFormat('#,##0', 'fr_FR');
+    final code = (bon['code_bon'] ?? bon['num_fiche'] ?? '').toString();
+    final montant = double.tryParse(bon['montant']?.toString() ?? '0') ?? 0;
+    final titre = 'Bon carburant $code';
+    fileName ??= 'bon_$code.pdf';
+
+    pw.Widget line(String label, dynamic value) => pw.Container(
+          padding: const pw.EdgeInsets.symmetric(vertical: 4),
+          child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Expanded(
+                    flex: 4,
+                    child: pw.Text(label,
+                        style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold, fontSize: 11))),
+                pw.SizedBox(width: 8),
+                pw.Expanded(
+                    flex: 6,
+                    child: pw.Text((value ?? '').toString(),
+                        style: const pw.TextStyle(fontSize: 11))),
+              ]),
+        );
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a5,
+        build: (ctx) => pw.Container(
+          padding: const pw.EdgeInsets.all(24),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(titre,
+                  style: pw.TextStyle(
+                      fontWeight: pw.FontWeight.bold, fontSize: 18)),
+              pw.SizedBox(height: 8),
+              pw.Divider(),
+              line('Code', code),
+              line('Bénéficiaire', bon['nom_beneficiaire']),
+              line('Montant', '${fmt.format(montant)} XOF'),
+              line('Date demande', bon['date_demande']),
+              line('Motif', bon['motif']),
+              line('Véhicule', bon['vehicule']),
+              line('Num fiche', bon['num_fiche']),
+              line('Créé le', bon['created_at']),
+              pw.SizedBox(height: 16),
+              pw.Text('Document généré par Gestion Carburant',
+                  style:
+                      const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+            ],
+          ),
+        ),
+      ),
+    );
+
     final dir = await _exportDir();
     final file = File('${dir.path}/$fileName');
     await file.writeAsBytes(await pdf.save());

@@ -6,6 +6,10 @@ class CacheService {
   static const String _statsKey = 'stats_all';
   static const String _rowsKey = 'rows_all';
   static const String _tsKey = 'timestamp';
+  // Clés additionnelles pour cache des bons
+  static const String _bonsPrefix = 'bons_page_';
+  static const String _bonsMetaKey =
+      'bons_meta'; // stocker infos (pages mises en cache)
   static const Duration defaultTtl = Duration(hours: 1);
 
   static Future<void> init() async {
@@ -47,5 +51,65 @@ class CacheService {
   static Future<void> clear() async {
     final box = Hive.box(_historyBox);
     await box.clear();
+  }
+
+  // ================== BONS (historique paginé) ==================
+  static Future<void> saveBonsPage(int page, List<Map<String, dynamic>> bons,
+      {double? montantTotal, bool? hasMore}) async {
+    final box = Hive.box(_historyBox);
+    box.put('${_bonsPrefix}$page', jsonEncode(bons));
+    Map<String, dynamic> meta = {};
+    if (box.containsKey(_bonsMetaKey)) {
+      try {
+        meta = jsonDecode(box.get(_bonsMetaKey)) as Map<String, dynamic>;
+      } catch (_) {}
+    }
+    meta['updated_at'] = DateTime.now().toIso8601String();
+    final mt = (montantTotal ?? meta['montantTotal']) ?? 0;
+    if (montantTotal != null) meta['montantTotal'] = mt;
+    if (hasMore != null) meta['hasMore_$page'] = hasMore;
+    // marquer page comme présente
+    final pages = (meta['pages'] as List?)?.cast<int>() ?? <int>[];
+    if (!pages.contains(page)) pages.add(page);
+    meta['pages'] = pages;
+    box.put(_bonsMetaKey, jsonEncode(meta));
+  }
+
+  static Future<(List<Map<String, dynamic>>?, Map<String, dynamic>?)>
+      loadBonsPage(int page, {Duration? ttl}) async {
+    final box = Hive.box(_historyBox);
+    if (!box.containsKey(_bonsMetaKey)) return (null, null);
+    final metaRaw = box.get(_bonsMetaKey) as String?;
+    if (metaRaw == null) return (null, null);
+    Map<String, dynamic>? meta;
+    try {
+      meta = jsonDecode(metaRaw) as Map<String, dynamic>;
+    } catch (_) {
+      return (null, null);
+    }
+    final tsStr = meta['updated_at']?.toString();
+    final ts = tsStr != null ? DateTime.tryParse(tsStr) : null;
+    final life = ttl ?? defaultTtl;
+    if (ts == null || DateTime.now().difference(ts) > life) return (null, null);
+    final key = '${_bonsPrefix}$page';
+    if (!box.containsKey(key)) return (null, null);
+    try {
+      final jsonStr = box.get(key) as String?;
+      if (jsonStr == null) return (null, null);
+      final list = List<Map<String, dynamic>>.from(jsonDecode(jsonStr));
+      return (list, meta);
+    } catch (_) {
+      return (null, null);
+    }
+  }
+
+  static Future<void> clearBonsCache() async {
+    final box = Hive.box(_historyBox);
+    final keysToRemove = box.keys
+        .where((k) => k.toString().startsWith(_bonsPrefix) || k == _bonsMetaKey)
+        .toList();
+    for (final k in keysToRemove) {
+      box.delete(k);
+    }
   }
 }
