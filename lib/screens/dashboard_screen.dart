@@ -36,6 +36,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _announced = false;
   bool _lowStockBanner = false; // indique si on affiche la bannière bas stock
   bool _wasAboveLowThreshold = true; // pour détecter transition
+  final ValueNotifier<double> _historyProgress = ValueNotifier<double>(0.0);
+  bool _loadingFullHistory = false;
+  bool _fadeOutProgress = false; // animation de sortie barre
 
   @override
   void initState() {
@@ -365,57 +368,163 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<Map<String, dynamic>> _loadFullStats({bool force = false}) async {
-    final stats = await apiService.fetchSoldeEvolutionStatsAll(
-        maxYears: 20, forceRefresh: force);
-    _lastRefresh = DateTime.now();
-    _statsCache = stats;
-    // Alerte haute utilisation
-    final utilPct = ((stats['utilisation'] ?? 0.0) * 100);
-    if (utilPct >= 90) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Alerte: ${utilPct.toStringAsFixed(0)}% utilisé')),
-        );
-      });
-    }
-    // Alerte bas niveau (solde restant < 10% du total rechargé)
-    final totalRechargement = (stats['totalRechargement'] ?? 0).toDouble();
-    final soldeActuel = (stats['soldeActuel'] ?? 0).toDouble();
-    if (totalRechargement > 0) {
-      final restantPct = (soldeActuel / totalRechargement) * 100;
-      if (restantPct <= 10) {
-        // Transition ?
-        if (_wasAboveLowThreshold) {
-          _lowStockBanner = true;
-          _wasAboveLowThreshold = false;
-        }
+    _historyProgress.value = 0.0;
+    _loadingFullHistory = true;
+    _fadeOutProgress = false;
+    late Map<String, dynamic> stats;
+    try {
+      // On réutilise la méthode existante qui calcule puis met en cache Hive.
+      stats = await apiService.fetchSoldeEvolutionStatsAll(
+        maxYears: 20,
+        forceRefresh: force,
+        onProgress: (p) {
+          // Lissage léger: ne jamais reculer la progression
+          if (p >= _historyProgress.value) {
+            _historyProgress.value = p;
+            assert(() {
+              debugPrint(
+                  '[FullHistoryProgress] ${(p * 100).toStringAsFixed(1)}%');
+              return true;
+            }());
+          }
+        },
+      );
+      _lastRefresh = DateTime.now();
+      _statsCache = stats;
+      // Alerte haute utilisation
+      final utilPct = ((stats['utilisation'] ?? 0.0) * 100);
+      if (utilPct >= 90) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
-          final msg =
-              'Alerte: seulement ${restantPct.toStringAsFixed(1)}% du stock reste';
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg)),
-          );
-          NotificationHelper.instance.showSimple(
-            id: 103,
-            title: 'Stock carburant bas',
-            body: msg,
+            SnackBar(
+                content:
+                    Text('Alerte: ${utilPct.toStringAsFixed(0)}% utilisé')),
           );
         });
-      } else {
-        _wasAboveLowThreshold = true;
-        _lowStockBanner = false;
       }
+      // Alerte bas niveau
+      final totalRechargement = (stats['totalRechargement'] ?? 0).toDouble();
+      final soldeActuel = (stats['soldeActuel'] ?? 0).toDouble();
+      if (totalRechargement > 0) {
+        final restantPct = (soldeActuel / totalRechargement) * 100;
+        if (restantPct <= 10) {
+          if (_wasAboveLowThreshold) {
+            _lowStockBanner = true;
+            _wasAboveLowThreshold = false;
+          }
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            final msg =
+                'Alerte: seulement ${restantPct.toStringAsFixed(1)}% du stock reste';
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(msg)),
+            );
+            NotificationHelper.instance.showSimple(
+              id: 103,
+              title: 'Stock carburant bas',
+              body: msg,
+            );
+          });
+        } else {
+          _wasAboveLowThreshold = true;
+          _lowStockBanner = false;
+        }
+      }
+      return stats;
+    } finally {
+      _loadingFullHistory = true; // reste true jusqu’au fade out
+      Future.microtask(() => _historyProgress.value = 1.0);
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (!mounted) return;
+        if (_historyProgress.value >= 1.0) {
+          setState(() => _fadeOutProgress = true);
+          Future.delayed(const Duration(milliseconds: 550), () {
+            if (!mounted) return;
+            setState(() {
+              _loadingFullHistory = false; // retire définitivement
+            });
+          });
+        }
+      });
     }
-    return stats;
   }
 
   Widget _buildSoldeSection(Map<String, dynamic> data) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_loadingFullHistory)
+          AnimatedOpacity(
+            opacity: _fadeOutProgress ? 0.0 : 1.0,
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeOut,
+            child: ValueListenableBuilder<double>(
+              valueListenable: _historyProgress,
+              builder: (context, v, _) {
+                final pct = (v * 100).clamp(0, 100).toStringAsFixed(0);
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF223C4A),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.cloud_download,
+                          color: Colors.white54, size: 18),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: LinearProgressIndicator(
+                            value: v.clamp(0.0, 1.0),
+                            minHeight: 8,
+                            backgroundColor: Colors.white10,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.tealAccent.withOpacity(0.85)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text('$pct%',
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 12)),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              backgroundColor: const Color(0xFF17333F),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
+                              title: const Text('Progression',
+                                  style: TextStyle(color: Colors.white)),
+                              content: Text(
+                                'Chargement historique...\n$pct% effectué.',
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Fermer'),
+                                )
+                              ],
+                            ),
+                          );
+                        },
+                        child: const Icon(Icons.info_outline,
+                            size: 18, color: Colors.white54),
+                      )
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [

@@ -41,6 +41,11 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
   double montantTotal = 0;
   bool fromCacheGlobal =
       false; // indique si la dernière page chargée venait du cache
+  bool staleCache = false; // indique si cache expiré utilisé (fallback)
+  int _stalePagesCount = 0; // nombre de pages servies en mode stale
+  Duration _ttl = const Duration(hours: 1);
+  String? _parseError; // erreur de parsing potentielle
+  bool _emptyResponse = false; // réponse vide serveur
 
   // Filtres
   String? station;
@@ -87,13 +92,23 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
         dateFin: dateFin,
         montantMin: montantMin,
         montantMax: montantMax,
-        cacheTtl: const Duration(hours: 1),
+        cacheTtl: _ttl,
       );
       setState(() {
         bons.addAll(List<Map<String, dynamic>>.from(result['bons']));
         montantTotal = (result['montantTotal'] ?? 0.0).toDouble();
         hasMore = result['hasMore'] == true;
         fromCacheGlobal = result['fromCache'] == true && page == 1;
+        if (result['stale'] == true) {
+          if (page == 1) {
+            staleCache = true;
+          }
+          _stalePagesCount++;
+        }
+        if (page == 1) {
+          _parseError = result['parseError'] as String?;
+          _emptyResponse = result['emptyResponse'] == true;
+        }
         page++;
       });
     } catch (e) {
@@ -207,6 +222,7 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
     DateTime? selectedFin = dateFin;
     double? selectedMin = montantMin;
     double? selectedMax = montantMax;
+    Duration tempTtl = _ttl;
 
     await showDialog(
       context: context,
@@ -356,6 +372,29 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                 ],
                 onChanged: (v) => statutFiltre = v,
               ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int>(
+                value: tempTtl.inMinutes,
+                decoration: InputDecoration(
+                  labelText: 'Durée cache (TTL)',
+                  labelStyle: const TextStyle(color: Colors.white70),
+                  filled: true,
+                  fillColor: const Color(0xFF223C4A),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                dropdownColor: const Color(0xFF223C4A),
+                style: const TextStyle(color: Colors.white),
+                items: const [
+                  DropdownMenuItem(value: 15, child: Text('15 min')),
+                  DropdownMenuItem(value: 30, child: Text('30 min')),
+                  DropdownMenuItem(value: 60, child: Text('1 h')),
+                  DropdownMenuItem(value: 120, child: Text('2 h')),
+                ],
+                onChanged: (v) {
+                  if (v != null) tempTtl = Duration(minutes: v);
+                },
+              ),
             ],
           ),
         ),
@@ -368,6 +407,7 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                 dateFin = selectedFin;
                 montantMin = selectedMin;
                 montantMax = selectedMax;
+                _ttl = tempTtl;
               });
               Navigator.pop(context);
               _loadBons(reset: true);
@@ -393,9 +433,57 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
         title: const Text("Historique des bons"),
         backgroundColor: const Color(0xFF17333F),
         actions: [
+          if (_stalePagesCount > 0)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.deepOrangeAccent.withOpacity(0.35),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'stale: $_stalePagesCount',
+                    style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic),
+                  ),
+                ),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.filter_alt, color: Colors.white),
             onPressed: _showFiltreDialog,
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onSelected: (val) async {
+              if (val == 'purge') {
+                await CacheService.clearBonsCache();
+                if (mounted) {
+                  setState(() {
+                    _stalePagesCount = 0;
+                    staleCache = false;
+                  });
+                }
+                await _loadBons(reset: true);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Cache des bons purgé avec succès.')),
+                  );
+                }
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'purge',
+                child: Text('Purger cache bons'),
+              ),
+            ],
           ),
         ],
       ),
@@ -415,15 +503,50 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
                 children: [
                   const Icon(Icons.offline_bolt, color: Colors.amber, size: 18),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Affichage depuis le cache local (1h). Glissez vers le bas pour actualiser.',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                      staleCache
+                          ? 'Affichage depuis le cache (stale) expiré. Glissez vers le bas pour tenter de rafraîchir.'
+                          : 'Affichage depuis le cache local (TTL actif). Glissez vers le bas pour actualiser.',
+                      style:
+                          const TextStyle(color: Colors.white70, fontSize: 12),
                     ),
                   ),
                   TextButton(
                     onPressed: _forceRefresh,
                     child: const Text('Rafraîchir'),
+                  )
+                ],
+              ),
+            ),
+          if (_parseError != null)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.25),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orangeAccent.withOpacity(0.6)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.warning_amber_rounded,
+                      color: Colors.orangeAccent, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Données partielles: ${_parseError!}\nVous pouvez rafraîchir pour réessayer.',
+                      style:
+                          const TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Masquer',
+                    onPressed: () => setState(() => _parseError = null),
+                    icon: const Icon(Icons.close,
+                        size: 18, color: Colors.white54),
                   )
                 ],
               ),
@@ -457,8 +580,30 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text("Montant total",
-                    style: TextStyle(color: Colors.white70)),
+                Row(children: [
+                  const Text("Montant total",
+                      style: TextStyle(color: Colors.white70)),
+                  if (fromCacheGlobal) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: staleCache
+                            ? Colors.deepOrangeAccent.withOpacity(0.35)
+                            : Colors.blueGrey.withOpacity(0.4),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        staleCache ? '(stale)' : '(cache)',
+                        style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic),
+                      ),
+                    )
+                  ]
+                ]),
                 Text(
                   "${formatMontant.format(montantTotal)} XOF",
                   style: const TextStyle(
@@ -477,6 +622,30 @@ class _HistoriqueBonsScreenState extends State<HistoriqueBonsScreen> {
               child: CustomScrollView(
                 controller: _scrollController,
                 slivers: [
+                  if (_emptyResponse && bons.isEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 48, 24, 12),
+                        child: Column(
+                          children: [
+                            Icon(Icons.inbox_outlined,
+                                size: 56, color: Colors.white30),
+                            SizedBox(height: 12),
+                            Text('Aucune donnée (réponse vide serveur).',
+                                style: TextStyle(
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.w600)),
+                            SizedBox(height: 8),
+                            Text(
+                              'Tirez pour rafraîchir. Si le problème persiste, vérifier l’API historique_bons.',
+                              style: TextStyle(
+                                  color: Colors.white54, fontSize: 12),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {

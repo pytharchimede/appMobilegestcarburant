@@ -103,6 +103,31 @@ class CacheService {
     }
   }
 
+  // Chargement d'une page de bons en ignorant le TTL (fallback en cas d'échec réseau / JSON)
+  static Future<(List<Map<String, dynamic>>?, Map<String, dynamic>?)>
+      loadBonsPageStale(int page) async {
+    final box = Hive.box(_historyBox);
+    if (!box.containsKey(_bonsMetaKey)) return (null, null);
+    final metaRaw = box.get(_bonsMetaKey) as String?;
+    if (metaRaw == null) return (null, null);
+    Map<String, dynamic>? meta;
+    try {
+      meta = jsonDecode(metaRaw) as Map<String, dynamic>;
+    } catch (_) {
+      return (null, null);
+    }
+    final key = '${_bonsPrefix}$page';
+    if (!box.containsKey(key)) return (null, null);
+    try {
+      final jsonStr = box.get(key) as String?;
+      if (jsonStr == null) return (null, null);
+      final list = List<Map<String, dynamic>>.from(jsonDecode(jsonStr));
+      return (list, meta);
+    } catch (_) {
+      return (null, null);
+    }
+  }
+
   static Future<void> clearBonsCache() async {
     final box = Hive.box(_historyBox);
     final keysToRemove = box.keys

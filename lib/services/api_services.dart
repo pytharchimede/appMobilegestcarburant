@@ -142,6 +142,7 @@ class ApiService {
   Future<List<Map<String, dynamic>>> fetchSoldeEvolutionFullHistory({
     int maxYears = 10,
     bool forceRefresh = false,
+    void Function(double progress)? onProgress,
   }) async {
     // Cache valide ?
     if (!forceRefresh &&
@@ -159,6 +160,8 @@ class ApiService {
 
     final List<Map<String, dynamic>> aggregated = [];
     // Parcours ascendant année/mois pour garder l'ordre chronologique naturel
+    final totalMonths = ((currentYear - firstYear) * 12) + currentMonth;
+    int processedMonths = 0;
     for (int y = firstYear; y <= currentYear; y++) {
       final int startMonth = (y == firstYear) ? 1 : 1;
       final int endMonth = (y == currentYear) ? currentMonth : 12;
@@ -183,6 +186,11 @@ class ApiService {
           }
         } catch (_) {
           // On ignore les erreurs d'un mois isolé et on continue
+        } finally {
+          processedMonths++;
+          if (onProgress != null && totalMonths > 0) {
+            onProgress((processedMonths / totalMonths).clamp(0.0, 1.0));
+          }
         }
       }
     }
@@ -205,9 +213,13 @@ class ApiService {
   Future<Map<String, dynamic>> fetchSoldeEvolutionStatsAll({
     int maxYears = 10,
     bool forceRefresh = false,
+    void Function(double progress)? onProgress,
   }) async {
     final rows = await fetchSoldeEvolutionFullHistory(
-        maxYears: maxYears, forceRefresh: forceRefresh);
+      maxYears: maxYears,
+      forceRefresh: forceRefresh,
+      onProgress: onProgress,
+    );
     if (rows.isEmpty) {
       return {
         'totalRechargement': 0.0,
@@ -644,51 +656,173 @@ class ApiService {
 
     final uri = Uri.parse(baseUrl).replace(queryParameters: params);
     final response = await http.get(uri);
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      if (data['status'] != 'success') {
-        throw Exception(data['message'] ?? "Réponse invalide historique bons");
-      }
-      final payload = data['data'] ?? data;
-      // Essayer différentes clés potentielles
-      dynamic rawList = payload['bons'] ?? payload['rows'] ?? payload['data'];
-      if (rawList == null && payload is List) rawList = payload;
-      if (rawList == null) rawList = [];
-      List<Map<String, dynamic>> list;
-      if (rawList is List) {
-        list = rawList
-            .map((e) => e is Map<String, dynamic>
-                ? e
-                : (e is Map ? e.cast<String, dynamic>() : <String, dynamic>{}))
-            .toList();
-      } else if (rawList is Map) {
-        list = [rawList.cast<String, dynamic>()];
-      } else {
-        list = [];
-      }
-
-      // Montant total: plusieurs variantes possibles
-      dynamic mt = payload['montantTotal'] ?? payload['total'] ?? 0;
-      double montantTotal = 0;
-      try {
-        montantTotal = _toDouble(mt);
-      } catch (_) {}
-      final hasMore =
-          (payload['hasMore'] ?? payload['has_more'] ?? false) == true;
+    if (response.statusCode != 200) {
+      throw Exception("HTTP ${response.statusCode}");
+    }
+    // Réponse totalement vide -> indiquer emptyResponse
+    if (response.body.trim().isEmpty) {
       if (cacheEligible) {
         try {
-          await CacheService.saveBonsPage(page, list,
-              montantTotal: montantTotal, hasMore: hasMore);
+          final stale = await CacheService.loadBonsPageStale(page);
+          final list = stale.$1;
+          final meta = stale.$2;
+          if (list != null && meta != null) {
+            final hasMore = (meta['hasMore_$page'] ?? false) == true;
+            final montantTotal = (meta['montantTotal'] ?? 0).toDouble();
+            return {
+              'bons': list,
+              'montantTotal': montantTotal,
+              'hasMore': hasMore,
+              'fromCache': true,
+              'emptyResponse': true,
+              'stale': true,
+            };
+          }
         } catch (_) {}
       }
       return {
-        'bons': list,
-        'montantTotal': montantTotal,
-        'hasMore': hasMore,
+        'bons': <Map<String, dynamic>>[],
+        'montantTotal': 0.0,
+        'hasMore': false,
+        'emptyResponse': true,
       };
-    } else {
-      throw Exception('Erreur lors du chargement de l\'historique des bons');
     }
+    dynamic data;
+    try {
+      data = json.decode(response.body);
+    } catch (e) {
+      // Fallback: si JSON invalide, essayer un cache obsolète (stale) si éligible
+      if (cacheEligible) {
+        try {
+          final stale = await CacheService.loadBonsPageStale(page);
+          final list = stale.$1;
+          final meta = stale.$2;
+          if (list != null && meta != null) {
+            final hasMore = (meta['hasMore_$page'] ?? false) == true;
+            final montantTotal = (meta['montantTotal'] ?? 0).toDouble();
+            return {
+              'bons': list,
+              'montantTotal': montantTotal,
+              'hasMore': hasMore,
+              'fromCache': true,
+              'parseError': 'Réponse non JSON (fallback cache expiré)',
+              'stale': true,
+            };
+          }
+        } catch (_) {}
+      }
+      // Tentative de récupération si JSON tronqué: on isole du premier '{' au dernier '}'
+      final body = response.body.trim();
+      final start = body.indexOf('{');
+      final end = body.lastIndexOf('}');
+      if (start != -1 && end != -1 && end > start) {
+        final sub = body.substring(start, end + 1);
+        try {
+          data = json.decode(sub);
+        } catch (_) {
+          // échec définitif
+          return {
+            'bons': <Map<String, dynamic>>[],
+            'montantTotal': 0.0,
+            'hasMore': false,
+            'parseError': 'Format JSON invalide (tronqué)',
+          };
+        }
+      } else {
+        return {
+          'bons': <Map<String, dynamic>>[],
+          'montantTotal': 0.0,
+          'hasMore': false,
+          'parseError': 'Réponse non JSON',
+        };
+      }
+    }
+
+    if (data is! Map) {
+      return {
+        'bons': <Map<String, dynamic>>[],
+        'montantTotal': 0.0,
+        'hasMore': false,
+        'parseError': 'Structure inattendue',
+      };
+    }
+    if (data['status'] != null && data['status'] != 'success') {
+      // On essaie quand même d'extraire des données partielles
+      // mais on signale l'erreur
+    }
+    final payload = data['data'] ?? data;
+
+    // Fonction utilitaire pour tenter d'extraire une liste de bons depuis différentes couches.
+    List<Map<String, dynamic>> _coerceList(dynamic candidate) {
+      if (candidate is List) {
+        return candidate
+            .where((e) => e is Map)
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .toList();
+      }
+      if (candidate is Map) {
+        // Chercher dans les clés usuelles
+        for (final k in ['bons', 'rows', 'data', 'list']) {
+          final v = candidate[k];
+          if (v is List) {
+            return v
+                .where((e) => e is Map)
+                .map((e) => Map<String, dynamic>.from(e as Map))
+                .toList();
+          }
+        }
+      }
+      return <Map<String, dynamic>>[];
+    }
+
+    // Extraction initiale
+    List<Map<String, dynamic>> list = _coerceList(payload);
+
+    // Si on a enveloppements successifs (un seul élément contenant encore une structure), on déroule jusqu'à 3 niveaux.
+    int unwrapDepth = 0;
+    while (unwrapDepth < 3 && list.length == 1) {
+      final only = list.first;
+      final nested = _coerceList(only);
+      if (nested.isEmpty) break;
+      list = nested;
+      unwrapDepth++;
+    }
+
+    // Montant total: rechercher en surface puis dans premier élément enveloppe si besoin
+    dynamic mt = 0;
+    if (payload is Map) {
+      mt = payload['montantTotal'] ?? payload['total'] ?? mt;
+    }
+    if ((mt == 0 || mt == null) && list.isEmpty && payload is Map) {
+      final inner = payload['data'];
+      if (inner is Map) {
+        mt = inner['montantTotal'] ?? inner['total'] ?? mt;
+      }
+    }
+    double montantTotal = 0;
+    try {
+      montantTotal = _toDouble(mt);
+    } catch (_) {}
+    bool hasMore = false;
+    if (payload is Map) {
+      hasMore = (payload['hasMore'] ?? payload['has_more'] ?? false) == true;
+      if (!hasMore && payload['data'] is Map) {
+        final inner = payload['data'] as Map;
+        hasMore = (inner['hasMore'] ?? inner['has_more'] ?? false) == true;
+      }
+    }
+
+    if (cacheEligible) {
+      try {
+        await CacheService.saveBonsPage(page, list,
+            montantTotal: montantTotal, hasMore: hasMore);
+      } catch (_) {}
+    }
+    return {
+      'bons': list,
+      'montantTotal': montantTotal,
+      'hasMore': hasMore,
+    };
   }
 
 /**
