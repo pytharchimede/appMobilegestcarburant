@@ -1,5 +1,7 @@
 // Fichier principal Flutter : main.dart
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'services/cache_service.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -28,6 +30,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+  await CacheService.init();
   // Important sur le Web: fournir les options de configuration
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,

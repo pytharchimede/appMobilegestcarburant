@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
 import '../services/api_services.dart';
+import '../services/export_service.dart';
 
 class SoldeEvolutionWidget extends StatefulWidget {
   @override
@@ -14,6 +15,7 @@ class _SoldeEvolutionWidgetState extends State<SoldeEvolutionWidget> {
   List<Map<String, dynamic>> donnees = [];
   bool isLoading = true;
   String? error;
+  Map<String, dynamic>? _statsAll;
 
   @override
   void initState() {
@@ -25,9 +27,11 @@ class _SoldeEvolutionWidgetState extends State<SoldeEvolutionWidget> {
     try {
       final data =
           await apiService.fetchSoldeEvolutionFullHistory(maxYears: 20);
+      final stats = await apiService.fetchSoldeEvolutionStatsAll(maxYears: 20);
       setState(() {
         donnees = data;
         isLoading = false;
+        _statsAll = stats;
       });
     } catch (e) {
       setState(() {
@@ -137,9 +141,21 @@ class _SoldeEvolutionWidgetState extends State<SoldeEvolutionWidget> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Historique global (Entrées / Sorties / Solde)',
-                style: TextStyle(color: Colors.white70)),
-            SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Text('Historique global (Entrées / Sorties / Solde)',
+                      style: TextStyle(color: Colors.white70)),
+                ),
+                _ExportMenu(rows: dataTriee, stats: _statsAll),
+              ],
+            ),
+            SizedBox(height: 6),
+            if (_statsAll != null)
+              Text(
+                  'Période: ${_statsAll!['premiereDate'] ?? '-'} -> ${_statsAll!['derniereDate'] ?? '-'}',
+                  style: const TextStyle(color: Colors.white38, fontSize: 11)),
+            SizedBox(height: 6),
             Container(
               height: 220,
               child: LineChart(
@@ -236,5 +252,60 @@ class _SoldeEvolutionWidgetState extends State<SoldeEvolutionWidget> {
         ),
       ),
     );
+  }
+}
+
+class _ExportMenu extends StatelessWidget {
+  final List<Map<String, dynamic>> rows;
+  final Map<String, dynamic>? stats;
+  const _ExportMenu({required this.rows, required this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      tooltip: 'Exporter / Partager',
+      icon: const Icon(Icons.more_vert, color: Colors.white70),
+      onSelected: (v) async {
+        final messenger = ScaffoldMessenger.of(context);
+        try {
+          if (v == 'csv') {
+            final f = await ExportService.exportCsv(rows);
+            messenger.showSnackBar(SnackBar(content: Text('CSV: ${f.path}')));
+            await ExportService.openFile(f);
+          } else if (v == 'excel') {
+            final f = await ExportService.exportExcel(rows);
+            messenger.showSnackBar(SnackBar(content: Text('Excel: ${f.path}')));
+            await ExportService.openFile(f);
+          } else if (v == 'pdf') {
+            final f = await ExportService.exportPdf(rows, stats ?? {});
+            messenger.showSnackBar(SnackBar(content: Text('PDF: ${f.path}')));
+            await ExportService.openFile(f);
+          } else if (v == 'share') {
+            final summary = _buildSummary(stats);
+            messenger.showSnackBar(SnackBar(
+                content: Text('Résumé prêt (${summary.length} caractères).')));
+          }
+        } catch (e) {
+          messenger.showSnackBar(SnackBar(content: Text('Erreur: $e')));
+        }
+      },
+      itemBuilder: (c) => const [
+        PopupMenuItem(value: 'csv', child: Text('Exporter CSV')),
+        PopupMenuItem(value: 'excel', child: Text('Exporter Excel')),
+        PopupMenuItem(value: 'pdf', child: Text('Exporter PDF')),
+        PopupMenuItem(value: 'share', child: Text('Partager résumé')),
+      ],
+    );
+  }
+
+  String _buildSummary(Map<String, dynamic>? stats) {
+    if (stats == null) return 'Aucun résumé';
+    final utilPct =
+        (((stats['utilisation'] ?? 0.0) as num) * 100).toStringAsFixed(1);
+    return 'Carburant – Période ${stats['premiereDate'] ?? '-'} -> ${stats['derniereDate'] ?? '-'}\n'
+        'Total rechargé: ${stats['totalRechargement']}\n'
+        'Total servi: ${stats['totalServi']}\n'
+        'Solde: ${stats['soldeActuel']}\n'
+        'Utilisation: $utilPct%';
   }
 }

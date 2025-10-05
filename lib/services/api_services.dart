@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:http_parser/http_parser.dart';
+import 'cache_service.dart';
 
 class ApiService {
   static const String baseUrl = 'https://fidest.ci/decaissement/api/api.php';
@@ -247,7 +248,7 @@ class ApiService {
     final derniereDate = rows.lastWhere(
         (e) => (e['date'] ?? '').toString().isNotEmpty,
         orElse: () => {});
-    return {
+    final stats = {
       'totalRechargement': totalIn,
       'totalServi': totalOut,
       'soldeActuel': solde,
@@ -258,6 +259,10 @@ class ApiService {
       'derniereDate': derniereDate['date'],
       'nbJours': joursDistincts.length,
     };
+    try {
+      await CacheService.saveFullHistory(rows, stats);
+    } catch (_) {}
+    return stats;
   }
 
   double _toDouble(dynamic v) {
