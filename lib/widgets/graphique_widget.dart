@@ -23,8 +23,8 @@ class _GraphiqueWidgetState extends State<GraphiqueWidget> {
 
   Future<void> _loadData() async {
     try {
-      // Charger uniquement les stats (utilisation)
-      final stats = await apiService.fetchSoldeEvolutionStats();
+      // Full history stats désormais
+      final stats = await apiService.fetchSoldeEvolutionStatsAll(maxYears: 20);
       setState(() {
         pourcentage = (stats['utilisation'] ?? 0.0).toDouble().clamp(0.0, 1.0);
         totalIn = (stats['totalRechargement'] ?? 0.0).toDouble();
@@ -114,7 +114,7 @@ class _GraphiqueWidgetState extends State<GraphiqueWidget> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Niveau de carburant utilisé",
+                        "Utilisation cumulée (toute l'activité)",
                         style: TextStyle(color: Colors.white70, fontSize: 16),
                       ),
                       SizedBox(height: 8),

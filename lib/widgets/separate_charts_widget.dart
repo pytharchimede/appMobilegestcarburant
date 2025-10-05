@@ -24,7 +24,8 @@ class _SeparateChartsWidgetState extends State<SeparateChartsWidget> {
 
   Future<void> _load() async {
     try {
-      final data = await apiService.fetchSoldeEvolution();
+      final data =
+          await apiService.fetchSoldeEvolutionFullHistory(maxYears: 20);
       setState(() {
         donnees = List<Map<String, dynamic>>.from(data);
         isLoading = false;
@@ -48,45 +49,35 @@ class _SeparateChartsWidgetState extends State<SeparateChartsWidget> {
     }
 
     // Prépare les séries
-    final dataTriee = [...donnees];
-    dataTriee.sort((a, b) {
-      final da = a['date'];
-      final db = b['date'];
-      if (da is String && db is String) return da.compareTo(db);
-      final ja = (a['jour'] ?? 0) as num;
-      final jb = (b['jour'] ?? 0) as num;
-      return ja.compareTo(jb);
-    });
+    final dataTriee = [...donnees]; // déjà trié
     double safeNum(dynamic v) => (v is num) ? v.toDouble() : 0.0;
     final List<String> labels = [];
     final List<FlSpot> rechargementsSpots = [];
     final List<FlSpot> demandesSpots = [];
     final List<FlSpot> soldeSpots = [];
     double cumul = 0.0;
+    final int step = dataTriee.length > 1200
+        ? 4
+        : (dataTriee.length > 800 ? 3 : (dataTriee.length > 400 ? 2 : 1));
+    int visIndex = 0;
     for (int i = 0; i < dataTriee.length; i++) {
+      if (i % step != 0 && i != dataTriee.length - 1) continue;
       final p = dataTriee[i];
       final dateStr = (p['date'] ?? '').toString();
-      String label;
-      if (dateStr.isNotEmpty && dateStr.length >= 10) {
+      String label = '';
+      if (dateStr.length >= 10) {
         label = '${dateStr.substring(8, 10)}/${dateStr.substring(5, 7)}';
-      } else {
-        label = 'J${((p['jour'] ?? (i + 1)) as num).toInt()}';
       }
       labels.add(label);
-
-      final x = i.toDouble();
-      final recharge = p.containsKey('rechargement')
-          ? safeNum(p['rechargement'])
-          : safeNum(p['entree']).abs();
-      final demandeServie = p.containsKey('sortie_servie')
-          ? safeNum(p['sortie_servie'])
-          : safeNum(p['sortie']).abs();
+      final recharge = safeNum(p['rechargement'] ?? p['entree']);
+      final demandeServie =
+          safeNum(p['sortie_servie'] ?? p['demande_servie'] ?? p['sortie']);
+      cumul += recharge - demandeServie;
+      final x = visIndex.toDouble();
       rechargementsSpots.add(FlSpot(x, recharge));
       demandesSpots.add(FlSpot(x, demandeServie));
-      final double soldeVal = p.containsKey('solde_evolutif')
-          ? safeNum(p['solde_evolutif'])
-          : (cumul += recharge - demandeServie);
-      soldeSpots.add(FlSpot(x, soldeVal));
+      soldeSpots.add(FlSpot(x, cumul));
+      visIndex++;
     }
 
     return Column(
