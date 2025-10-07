@@ -143,6 +143,7 @@ class ApiService {
     int maxYears = 10,
     bool forceRefresh = false,
     void Function(double progress)? onProgress,
+    int maxConcurrent = 6,
   }) async {
     // Cache valide ?
     if (!forceRefresh &&
@@ -152,47 +153,100 @@ class ApiService {
         return _fullHistoryCache!;
       }
     }
-
     final now = DateTime.now();
     final int currentYear = now.year;
     final int currentMonth = now.month;
     final int firstYear = (currentYear - maxYears + 1).clamp(1970, currentYear);
 
-    final List<Map<String, dynamic>> aggregated = [];
-    // Parcours ascendant année/mois pour garder l'ordre chronologique naturel
-    final totalMonths = ((currentYear - firstYear) * 12) + currentMonth;
-    int processedMonths = 0;
+    // Préparer liste des couples (année, mois)
+    final List<(int, int)> allMonths = [];
     for (int y = firstYear; y <= currentYear; y++) {
-      final int startMonth = (y == firstYear) ? 1 : 1;
       final int endMonth = (y == currentYear) ? currentMonth : 12;
-      for (int m = startMonth; m <= endMonth; m++) {
-        try {
-          final monthRows = await fetchSoldeEvolution(annee: y, mois: m);
-          for (final r in monthRows) {
-            // Normalisation des champs importants
-            final map = Map<String, dynamic>.from(r);
-            // Uniformiser la clé date (si 'jour' seulement, on reconstruit une date approximative AAAA-MM-JJ)
-            if (!(map.containsKey('date')) ||
-                (map['date']?.toString().isEmpty ?? true)) {
-              final dayRaw = map['jour']?.toString();
-              if (dayRaw != null) {
-                final d = int.tryParse(dayRaw) ?? 1;
-                final mm = m.toString().padLeft(2, '0');
-                final dd = d.toString().padLeft(2, '0');
-                map['date'] = '$y-$m-$dd'.replaceFirst('-$m-', '-$mm-');
-              }
-            }
-            aggregated.add(map);
-          }
-        } catch (_) {
-          // On ignore les erreurs d'un mois isolé et on continue
-        } finally {
-          processedMonths++;
-          if (onProgress != null && totalMonths > 0) {
-            onProgress((processedMonths / totalMonths).clamp(0.0, 1.0));
-          }
+      for (int m = 1; m <= endMonth; m++) {
+        allMonths.add((y, m));
+      }
+    }
+
+    // Si on a déjà un cache expiré, ne récupérer que le delta des mois manquants
+    List<Map<String, dynamic>> baseCache = [];
+    final Set<String> cachedYearMonths = {};
+    if (!forceRefresh && _fullHistoryCache != null) {
+      baseCache = List<Map<String, dynamic>>.from(_fullHistoryCache!);
+      for (final row in baseCache) {
+        final ds = (row['date'] ?? row['jour'] ?? '').toString();
+        if (ds.length >= 7) {
+          // format AAAA-MM
+          cachedYearMonths.add(ds.substring(0, 7));
         }
       }
+    }
+
+    final List<(int, int)> monthsToFetch = allMonths.where((p) {
+      final (y, m) = p;
+      final ym =
+          '${y.toString().padLeft(4, '0')}-${m.toString().padLeft(2, '0')}';
+      return !cachedYearMonths.contains(ym);
+    }).toList();
+
+    // Si rien à récupérer (cache complet + delta vide) retourner immédiatement
+    if (monthsToFetch.isEmpty && baseCache.isNotEmpty) {
+      _fullHistoryCacheTime = DateTime.now();
+      return baseCache;
+    }
+
+    final List<Map<String, dynamic>> aggregated = []..addAll(baseCache);
+
+    final existingMonthsCount = cachedYearMonths.length;
+    final totalMonths = existingMonthsCount + monthsToFetch.length;
+    int processedNewMonths = 0;
+
+    Future<void> processMonth(int y, int m) async {
+      try {
+        final monthRows = await fetchSoldeEvolution(annee: y, mois: m);
+        for (final r in monthRows) {
+          final map = Map<String, dynamic>.from(r);
+          if (!(map.containsKey('date')) ||
+              (map['date']?.toString().isEmpty ?? true)) {
+            final dayRaw = map['jour']?.toString();
+            if (dayRaw != null) {
+              final d = int.tryParse(dayRaw) ?? 1;
+              final mm = m.toString().padLeft(2, '0');
+              final dd = d.toString().padLeft(2, '0');
+              map['date'] = '$y-$m-$dd'.replaceFirst('-$m-', '-$mm-');
+            }
+          }
+          aggregated.add(map);
+        }
+      } catch (_) {
+        // ignorer mois en échec
+      } finally {
+        processedNewMonths++;
+        if (onProgress != null && totalMonths > 0) {
+          final progress =
+              (existingMonthsCount + processedNewMonths) / totalMonths;
+          onProgress(progress.clamp(0.0, 1.0));
+        }
+      }
+    }
+
+    // Concurrence contrôlée sans accès à isCompleted (on gère en retirant à la fin via whenComplete)
+    final Set<Future<void>> pool = {};
+    for (final pair in monthsToFetch) {
+      final y = pair.$1;
+      final m = pair.$2;
+      // Créer future et l'enregistrer avant d'attendre
+      late Future<void> fut;
+      fut = processMonth(y, m).whenComplete(() {
+        pool.remove(fut);
+      });
+      pool.add(fut);
+      if (pool.length >= maxConcurrent) {
+        await Future.any(pool);
+      }
+    }
+    // Attendre vidage
+    while (pool.isNotEmpty) {
+      await Future.any(pool);
     }
 
     // Tri final par date

@@ -375,7 +375,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       // On réutilise la méthode existante qui calcule puis met en cache Hive.
       stats = await apiService.fetchSoldeEvolutionStatsAll(
-        maxYears: 20,
+        maxYears: 5,
         forceRefresh: force,
         onProgress: (p) {
           // Lissage léger: ne jamais reculer la progression
